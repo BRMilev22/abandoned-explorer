@@ -1,0 +1,726 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2D7DF756E2CB82D1E8599C68 /* Pods_upwork_project.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 157AEE9812C29A41766066F0 /* Pods_upwork_project.framework */; };
+		32D54B147BB418F29C5FD51E /* Pods_upwork_projectTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 335AAD7A2D4CAF56B6C5E0AB /* Pods_upwork_projectTests.framework */; };
+		52120C988C084B5B0DBE834B /* Pods_upwork_project_upwork_projectUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6BFD0E6F69751F8CD526E7A6 /* Pods_upwork_project_upwork_projectUITests.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		4599DBAA2E08668A00578100 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4599DB942E08668900578100 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4599DB9B2E08668900578100;
+			remoteInfo = "upwork-project";
+		};
+		4599DBB42E08668A00578100 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4599DB942E08668900578100 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4599DB9B2E08668900578100;
+			remoteInfo = "upwork-project";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		157AEE9812C29A41766066F0 /* Pods_upwork_project.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_upwork_project.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		335AAD7A2D4CAF56B6C5E0AB /* Pods_upwork_projectTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_upwork_projectTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		346715DB0BAB91FE28DF1B6F /* Pods-upwork-project-upwork-projectUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project-upwork-projectUITests.debug.xcconfig"; path = "Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests.debug.xcconfig"; sourceTree = "<group>"; };
+		4599DB9C2E08668900578100 /* upwork-project.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "upwork-project.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4599DBA92E08668A00578100 /* upwork-projectTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "upwork-projectTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4599DBB32E08668A00578100 /* upwork-projectUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "upwork-projectUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6BFD0E6F69751F8CD526E7A6 /* Pods_upwork_project_upwork_projectUITests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_upwork_project_upwork_projectUITests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		94154C1522CBFDAB5027FE37 /* Pods-upwork-projectTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-projectTests.debug.xcconfig"; path = "Target Support Files/Pods-upwork-projectTests/Pods-upwork-projectTests.debug.xcconfig"; sourceTree = "<group>"; };
+		A757741CBE13A7307331BE38 /* Pods-upwork-projectTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-projectTests.release.xcconfig"; path = "Target Support Files/Pods-upwork-projectTests/Pods-upwork-projectTests.release.xcconfig"; sourceTree = "<group>"; };
+		B6D00C2D2E1AC572D12E2587 /* Pods-upwork-project.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project.debug.xcconfig"; path = "Target Support Files/Pods-upwork-project/Pods-upwork-project.debug.xcconfig"; sourceTree = "<group>"; };
+		DD5F7BB4FC0671E867EBF32F /* Pods-upwork-project-upwork-projectUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project-upwork-projectUITests.release.xcconfig"; path = "Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests.release.xcconfig"; sourceTree = "<group>"; };
+		E78D80850B9F110E0B7E8D77 /* Pods-upwork-project.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project.release.xcconfig"; path = "Target Support Files/Pods-upwork-project/Pods-upwork-project.release.xcconfig"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		4599DB9E2E08668900578100 /* upwork-project */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "upwork-project";
+			sourceTree = "<group>";
+		};
+		4599DBAC2E08668A00578100 /* upwork-projectTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "upwork-projectTests";
+			sourceTree = "<group>";
+		};
+		4599DBB62E08668A00578100 /* upwork-projectUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "upwork-projectUITests";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4599DB992E08668900578100 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2D7DF756E2CB82D1E8599C68 /* Pods_upwork_project.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4599DBA62E08668A00578100 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				32D54B147BB418F29C5FD51E /* Pods_upwork_projectTests.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4599DBB02E08668A00578100 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				52120C988C084B5B0DBE834B /* Pods_upwork_project_upwork_projectUITests.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4599DB932E08668900578100 = {
+			isa = PBXGroup;
+			children = (
+				4599DB9E2E08668900578100 /* upwork-project */,
+				4599DBAC2E08668A00578100 /* upwork-projectTests */,
+				4599DBB62E08668A00578100 /* upwork-projectUITests */,
+				4599DB9D2E08668900578100 /* Products */,
+				EE11D22154BCE5C3EE5BED2D /* Pods */,
+				AA3C2488DA22472AC895D3BA /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		4599DB9D2E08668900578100 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4599DB9C2E08668900578100 /* upwork-project.app */,
+				4599DBA92E08668A00578100 /* upwork-projectTests.xctest */,
+				4599DBB32E08668A00578100 /* upwork-projectUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA3C2488DA22472AC895D3BA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				157AEE9812C29A41766066F0 /* Pods_upwork_project.framework */,
+				6BFD0E6F69751F8CD526E7A6 /* Pods_upwork_project_upwork_projectUITests.framework */,
+				335AAD7A2D4CAF56B6C5E0AB /* Pods_upwork_projectTests.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		EE11D22154BCE5C3EE5BED2D /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				B6D00C2D2E1AC572D12E2587 /* Pods-upwork-project.debug.xcconfig */,
+				E78D80850B9F110E0B7E8D77 /* Pods-upwork-project.release.xcconfig */,
+				346715DB0BAB91FE28DF1B6F /* Pods-upwork-project-upwork-projectUITests.debug.xcconfig */,
+				DD5F7BB4FC0671E867EBF32F /* Pods-upwork-project-upwork-projectUITests.release.xcconfig */,
+				94154C1522CBFDAB5027FE37 /* Pods-upwork-projectTests.debug.xcconfig */,
+				A757741CBE13A7307331BE38 /* Pods-upwork-projectTests.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4599DB9B2E08668900578100 /* upwork-project */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4599DBBD2E08668A00578100 /* Build configuration list for PBXNativeTarget "upwork-project" */;
+			buildPhases = (
+				61344970F79F775D238E1D41 /* [CP] Check Pods Manifest.lock */,
+				4599DB982E08668900578100 /* Sources */,
+				4599DB992E08668900578100 /* Frameworks */,
+				4599DB9A2E08668900578100 /* Resources */,
+				35C7525FB6D81E0E3FAE1B13 /* [CP] Embed Pods Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4599DB9E2E08668900578100 /* upwork-project */,
+			);
+			name = "upwork-project";
+			productName = "upwork-project";
+			productReference = 4599DB9C2E08668900578100 /* upwork-project.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4599DBA82E08668A00578100 /* upwork-projectTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4599DBC02E08668A00578100 /* Build configuration list for PBXNativeTarget "upwork-projectTests" */;
+			buildPhases = (
+				21F61683A0F80B55DAE3E909 /* [CP] Check Pods Manifest.lock */,
+				4599DBA52E08668A00578100 /* Sources */,
+				4599DBA62E08668A00578100 /* Frameworks */,
+				4599DBA72E08668A00578100 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4599DBAB2E08668A00578100 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4599DBAC2E08668A00578100 /* upwork-projectTests */,
+			);
+			name = "upwork-projectTests";
+			productName = "upwork-projectTests";
+			productReference = 4599DBA92E08668A00578100 /* upwork-projectTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		4599DBB22E08668A00578100 /* upwork-projectUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4599DBC32E08668A00578100 /* Build configuration list for PBXNativeTarget "upwork-projectUITests" */;
+			buildPhases = (
+				58FB78CFC3A981FD851AC147 /* [CP] Check Pods Manifest.lock */,
+				4599DBAF2E08668A00578100 /* Sources */,
+				4599DBB02E08668A00578100 /* Frameworks */,
+				4599DBB12E08668A00578100 /* Resources */,
+				290C7AF3CC1277E98BB6A926 /* [CP] Embed Pods Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4599DBB52E08668A00578100 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4599DBB62E08668A00578100 /* upwork-projectUITests */,
+			);
+			name = "upwork-projectUITests";
+			productName = "upwork-projectUITests";
+			productReference = 4599DBB32E08668A00578100 /* upwork-projectUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		4599DB942E08668900578100 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					4599DB9B2E08668900578100 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					4599DBA82E08668A00578100 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 4599DB9B2E08668900578100;
+					};
+					4599DBB22E08668A00578100 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 4599DB9B2E08668900578100;
+					};
+				};
+			};
+			buildConfigurationList = 4599DB972E08668900578100 /* Build configuration list for PBXProject "upwork-project" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 4599DB932E08668900578100;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 4599DB9D2E08668900578100 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4599DB9B2E08668900578100 /* upwork-project */,
+				4599DBA82E08668A00578100 /* upwork-projectTests */,
+				4599DBB22E08668A00578100 /* upwork-projectUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4599DB9A2E08668900578100 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4599DBA72E08668A00578100 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4599DBB12E08668A00578100 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		21F61683A0F80B55DAE3E909 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-upwork-projectTests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		290C7AF3CC1277E98BB6A926 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			inputPaths = (
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		35C7525FB6D81E0E3FAE1B13 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-upwork-project/Pods-upwork-project-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			inputPaths = (
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-upwork-project/Pods-upwork-project-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-upwork-project/Pods-upwork-project-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		58FB78CFC3A981FD851AC147 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-upwork-project-upwork-projectUITests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		61344970F79F775D238E1D41 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-upwork-project-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4599DB982E08668900578100 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4599DBA52E08668A00578100 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4599DBAF2E08668A00578100 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4599DBAB2E08668A00578100 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4599DB9B2E08668900578100 /* upwork-project */;
+			targetProxy = 4599DBAA2E08668A00578100 /* PBXContainerItemProxy */;
+		};
+		4599DBB52E08668A00578100 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4599DB9B2E08668900578100 /* upwork-project */;
+			targetProxy = 4599DBB42E08668A00578100 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		4599DBBB2E08668A00578100 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 24T3M8PF9V;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		4599DBBC2E08668A00578100 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 24T3M8PF9V;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		4599DBBE2E08668A00578100 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B6D00C2D2E1AC572D12E2587 /* Pods-upwork-project.debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 24T3M8PF9V;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to let you take photos of abandoned locations you want to submit.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs location access to show abandoned places near you and help you discover new locations.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "bmilev.upwork-project";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		4599DBBF2E08668A00578100 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = E78D80850B9F110E0B7E8D77 /* Pods-upwork-project.release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 24T3M8PF9V;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs camera access to let you take photos of abandoned locations you want to submit.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs location access to show abandoned places near you and help you discover new locations.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "bmilev.upwork-project";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		4599DBC12E08668A00578100 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 94154C1522CBFDAB5027FE37 /* Pods-upwork-projectTests.debug.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 24T3M8PF9V;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "bmilev.upwork-projectTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/upwork-project.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/upwork-project";
+			};
+			name = Debug;
+		};
+		4599DBC22E08668A00578100 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A757741CBE13A7307331BE38 /* Pods-upwork-projectTests.release.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 24T3M8PF9V;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "bmilev.upwork-projectTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/upwork-project.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/upwork-project";
+			};
+			name = Release;
+		};
+		4599DBC42E08668A00578100 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 346715DB0BAB91FE28DF1B6F /* Pods-upwork-project-upwork-projectUITests.debug.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 24T3M8PF9V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "bmilev.upwork-projectUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "upwork-project";
+			};
+			name = Debug;
+		};
+		4599DBC52E08668A00578100 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DD5F7BB4FC0671E867EBF32F /* Pods-upwork-project-upwork-projectUITests.release.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 24T3M8PF9V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "bmilev.upwork-projectUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "upwork-project";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		4599DB972E08668900578100 /* Build configuration list for PBXProject "upwork-project" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4599DBBB2E08668A00578100 /* Debug */,
+				4599DBBC2E08668A00578100 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4599DBBD2E08668A00578100 /* Build configuration list for PBXNativeTarget "upwork-project" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4599DBBE2E08668A00578100 /* Debug */,
+				4599DBBF2E08668A00578100 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4599DBC02E08668A00578100 /* Build configuration list for PBXNativeTarget "upwork-projectTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4599DBC12E08668A00578100 /* Debug */,
+				4599DBC22E08668A00578100 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4599DBC32E08668A00578100 /* Build configuration list for PBXNativeTarget "upwork-projectUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4599DBC42E08668A00578100 /* Debug */,
+				4599DBC52E08668A00578100 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 4599DB942E08668900578100 /* Project object */;
+}
