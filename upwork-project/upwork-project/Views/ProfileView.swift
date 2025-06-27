@@ -12,6 +12,7 @@ struct ProfileView: View {
     @State private var showSettings = false
     @State private var showReviewPrompt = false
     @State private var showDebug = false
+    @State private var showAdminPanel = false
     
     var body: some View {
         NavigationView {
@@ -27,7 +28,8 @@ struct ProfileView: View {
                         // Quick Actions
                         QuickActionsSection(
                             onReviewApp: { showReviewPrompt = true },
-                            onSettings: { showSettings = true }
+                            onSettings: { showSettings = true },
+                            onAdminPanel: dataManager.isAdmin ? { showAdminPanel = true } : nil
                         )
                         
                         // My Submissions
@@ -88,6 +90,21 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showDebug) {
                 DebugAuthView()
+            }
+            .sheet(isPresented: $showAdminPanel) {
+                NavigationView {
+                    AdminPanelView()
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    showAdminPanel = false
+                                }
+                                .foregroundColor(.orange)
+                            }
+                        }
+                }
+                .environmentObject(dataManager)
             }
             .alert("Enjoying the app?", isPresented: $showReviewPrompt) {
                 Button("Rate 5 Stars ⭐") {
@@ -274,6 +291,7 @@ struct ProfileStatCard: View {
 struct QuickActionsSection: View {
     let onReviewApp: () -> Void
     let onSettings: () -> Void
+    let onAdminPanel: (() -> Void)?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -282,6 +300,17 @@ struct QuickActionsSection: View {
                 .foregroundColor(.white)
             
             VStack(spacing: 12) {
+                // Admin Panel - only show for admin users
+                if let adminAction = onAdminPanel {
+                    ActionRow(
+                        icon: "shield.fill",
+                        title: "Admin Panel",
+                        subtitle: "Manage pending locations and stats",
+                        color: .blue,
+                        action: adminAction
+                    )
+                }
+                
                 ActionRow(
                     icon: "star.fill",
                     title: "Rate the App",
@@ -538,8 +567,8 @@ struct BookmarkedSection: View {
                 }
             }
         }
-        .sheet(item: $showingLocationDetail) { location in
-            LocationDetailView(location: location)
+                .fullScreenCover(item: $showingLocationDetail) { location in
+            LocationDetailModalView(location: location, selectedLocation: $showingLocationDetail)
         }
         .onAppear {
             // Refresh bookmarks every time the section appears

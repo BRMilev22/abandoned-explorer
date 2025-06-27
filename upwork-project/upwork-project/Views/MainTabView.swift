@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import Foundation
+import Combine
 
 struct MainTabView: View {
     @EnvironmentObject var dataManager: DataManager
@@ -16,70 +18,86 @@ struct MainTabView: View {
         TabView(selection: $selectedTab) {
             MapView()
                 .tabItem {
-                    Image(systemName: selectedTab == 0 ? "location.fill" : "location")
+                    Image(systemName: "map")
                     Text("Map")
                 }
                 .tag(0)
             
-            FeedView()
+            KeyAlertsView(
+                locations: dataManager.getApprovedLocations(),
+                userLocation: locationManager.userLocation,
+                currentLocationName: "Current Location"
+            )
                 .tabItem {
-                    Image(systemName: selectedTab == 1 ? "person.2.fill" : "person.2")
+                    Image(systemName: "exclamationmark.triangle")
                     Text("Alert Community")
                 }
                 .tag(1)
             
-            // News tab with red badge (like in Citizen)
             NewsView()
                 .tabItem {
-                    Image(systemName: selectedTab == 2 ? "globe.americas.fill" : "globe.americas")
+                    Image(systemName: "newspaper")
                     Text("News")
                 }
-                .badge(12) // Red notification badge like in Citizen
+                .if(dataManager.unreadNotificationCount > 0) { view in
+                    view.badge(dataManager.unreadNotificationCount)
+                }
                 .tag(2)
             
             SubmitLocationView()
                 .tabItem {
-                    Image(systemName: "plus.circle.fill")
+                    Image(systemName: "plus")
                     Text("Submit")
                 }
                 .tag(3)
-            
-            // Admin tab - only visible to admin users
-            if dataManager.isAdmin {
-                AdminPanelView()
-                    .tabItem {
-                        Image(systemName: "shield.fill")
-                        Text("Admin")
-                    }
-                    .tag(4)
-            }
         }
         .environmentObject(dataManager)
         .environmentObject(locationManager)
         .preferredColorScheme(.dark)
         .accentColor(.white)
         .onAppear {
-            // Set the tab bar appearance to match Citizen's black theme
-            let appearance = UITabBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = UIColor.black
-            
-            // Unselected item appearance
-            appearance.stackedLayoutAppearance.normal.iconColor = UIColor.gray
-            appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
-                NSAttributedString.Key.foregroundColor: UIColor.gray
-            ]
-            
-            // Selected item appearance  
-            appearance.stackedLayoutAppearance.selected.iconColor = UIColor.white
-            appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
-                NSAttributedString.Key.foregroundColor: UIColor.white
-            ]
-            
-            UITabBar.appearance().standardAppearance = appearance
-            if #available(iOS 15.0, *) {
-                UITabBar.appearance().scrollEdgeAppearance = appearance
+            setupTabBarAppearance()
+        }
+        // Refresh notifications periodically
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            if dataManager.isAuthenticated {
+                dataManager.loadNotifications()
             }
+        }
+    }
+    
+    private func setupTabBarAppearance() {
+        // Set the tab bar appearance to match Citizen's black theme
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor.black
+        
+        // Unselected item appearance
+        appearance.stackedLayoutAppearance.normal.iconColor = UIColor.gray
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
+            NSAttributedString.Key.foregroundColor: UIColor.gray
+        ]
+        
+        // Selected item appearance  
+        appearance.stackedLayoutAppearance.selected.iconColor = UIColor.white
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
+            NSAttributedString.Key.foregroundColor: UIColor.white
+        ]
+        
+        UITabBar.appearance().standardAppearance = appearance
+        if #available(iOS 15.0, *) {
+            UITabBar.appearance().scrollEdgeAppearance = appearance
+        }
+    }
+}
+
+// Extension to conditionally apply modifiers
+extension View {
+    @ViewBuilder func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
         }
     }
 }

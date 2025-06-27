@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import UIKit
+import CoreLocation
 
 class APIService: ObservableObject {
     static let shared = APIService()
@@ -235,8 +236,14 @@ class APIService: ObservableObject {
         return makeRequest(endpoint: endpoint, responseType: LocationsResponse.self)
     }
     
-    func getAllLocations(limit: Int = 50, offset: Int = 0) -> AnyPublisher<LocationsResponse, APIError> {
-        let endpoint = "/locations/feed?limit=\(limit)&offset=\(offset)"
+    func getAllLocations(limit: Int = 50, offset: Int = 0, userLocation: CLLocationCoordinate2D? = nil) -> AnyPublisher<LocationsResponse, APIError> {
+        var endpoint = "/locations/feed?limit=\(limit)&offset=\(offset)"
+        
+        // Add user location for geographic prioritization
+        if let location = userLocation {
+            endpoint += "&lat=\(location.latitude)&lng=\(location.longitude)&priority_radius=100"
+        }
+        
         return makeRequest(endpoint: endpoint, responseType: LocationsResponse.self)
     }
     
@@ -307,6 +314,68 @@ class APIService: ObservableObject {
                 LocationsResponse(locations: response.submissions, hasMore: response.hasMore)
             }
             .eraseToAnyPublisher()
+    }
+    
+    // MARK: - Dynamic Data Methods
+    
+    func getCategories() -> AnyPublisher<[DynamicCategory], APIError> {
+        return makeRequest(endpoint: "/locations/categories", responseType: CategoriesResponse.self)
+            .map(\.categories)
+            .eraseToAnyPublisher()
+    }
+    
+    func getDangerLevels() -> AnyPublisher<[DynamicDangerLevel], APIError> {
+        return makeRequest(endpoint: "/locations/danger-levels", responseType: DangerLevelsResponse.self)
+            .map(\.dangerLevels)
+            .eraseToAnyPublisher()
+    }
+    
+    func getTags(popular: Bool = false, limit: Int = 50) -> AnyPublisher<[DynamicTag], APIError> {
+        let endpoint = "/locations/tags?popular=\(popular)&limit=\(limit)"
+        return makeRequest(endpoint: endpoint, responseType: TagsResponse.self)
+            .map(\.tags)
+            .eraseToAnyPublisher()
+    }
+    
+    func getLocationStats() -> AnyPublisher<LocationStats, APIError> {
+        return makeRequest(endpoint: "/locations/stats", responseType: StatsResponse.self)
+            .map(\.stats)
+            .eraseToAnyPublisher()
+    }
+    
+
+    
+    // MARK: - Notifications Methods
+    
+    func getNotifications(unreadOnly: Bool = false, limit: Int = 20, offset: Int = 0) -> AnyPublisher<NotificationsResponse, APIError> {
+        let endpoint = "/users/notifications?unread_only=\(unreadOnly)&limit=\(limit)&offset=\(offset)"
+        return makeRequest(endpoint: endpoint, responseType: NotificationsResponse.self)
+    }
+    
+    func markNotificationAsRead(_ notificationId: Int) -> AnyPublisher<APISuccessResponse, APIError> {
+        return makeRequest(endpoint: "/users/notifications/\(notificationId)/read", method: .POST, responseType: APISuccessResponse.self)
+    }
+    
+    func markAllNotificationsAsRead() -> AnyPublisher<APISuccessResponse, APIError> {
+        return makeRequest(endpoint: "/users/notifications/read-all", method: .POST, responseType: APISuccessResponse.self)
+    }
+    
+    // MARK: - User Preferences Methods
+    
+    func getUserPreferences() -> AnyPublisher<UserPreferences, APIError> {
+        return makeRequest(endpoint: "/users/preferences", responseType: PreferencesResponse.self)
+            .map(\.preferences)
+            .eraseToAnyPublisher()
+    }
+    
+    func updateUserPreferences(_ preferences: UserPreferences) -> AnyPublisher<APISuccessResponse, APIError> {
+        let body = try? JSONEncoder().encode(["preferences": preferences])
+        return makeRequest(endpoint: "/users/preferences", method: .POST, body: body, responseType: APISuccessResponse.self)
+    }
+    
+    func getVisitedLocations(limit: Int = 20, offset: Int = 0) -> AnyPublisher<VisitedLocationsResponse, APIError> {
+        let endpoint = "/users/visited-locations?limit=\(limit)&offset=\(offset)"
+        return makeRequest(endpoint: endpoint, responseType: VisitedLocationsResponse.self)
     }
     
     // MARK: - Image Upload Methods
@@ -528,6 +597,58 @@ class APIService: ObservableObject {
                 }
             )
             .eraseToAnyPublisher()
+    }
+    
+    // MARK: - Location Details and Comments
+    
+    func getLocationDetails(locationId: Int) -> AnyPublisher<LocationDetailsResponse, APIError> {
+        return makeRequest(endpoint: "/locations/\(locationId)/details", responseType: LocationDetailsResponse.self)
+    }
+    
+    func getLocationComments(locationId: Int, limit: Int = 20, offset: Int = 0) -> AnyPublisher<CommentsResponse, APIError> {
+        let endpoint = "/locations/\(locationId)/comments?limit=\(limit)&offset=\(offset)"
+        return makeRequest(endpoint: endpoint, responseType: CommentsResponse.self)
+    }
+    
+    func addComment(locationId: Int, commentText: String, parentCommentId: Int? = nil) -> AnyPublisher<AddCommentResponse, APIError> {
+        let requestBody = AddCommentRequest(commentText: commentText, parentCommentId: parentCommentId)
+        let encoder = JSONEncoder()
+        
+        guard let data = try? encoder.encode(requestBody) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(
+            endpoint: "/locations/\(locationId)/comments",
+            method: .POST,
+            body: data,
+            responseType: AddCommentResponse.self
+        )
+    }
+    
+    func toggleLike(locationId: Int) -> AnyPublisher<ToggleLikeResponse, APIError> {
+        return makeRequest(
+            endpoint: "/locations/\(locationId)/toggle-like",
+            method: .POST,
+            responseType: ToggleLikeResponse.self
+        )
+    }
+    
+    func toggleBookmark(locationId: Int) -> AnyPublisher<ToggleBookmarkResponse, APIError> {
+        return makeRequest(
+            endpoint: "/locations/\(locationId)/toggle-bookmark",
+            method: .POST,
+            responseType: ToggleBookmarkResponse.self
+        )
+    }
+    
+    func trackLocationVisit(locationId: Int) -> AnyPublisher<VisitResponse, APIError> {
+        return makeRequest(
+            endpoint: "/locations/\(locationId)/visit",
+            method: .POST,
+            responseType: VisitResponse.self
+        )
     }
 }
 
@@ -906,5 +1027,257 @@ struct ActiveUsersStatistics: Codable {
         case active
         case recent
         case premiumUsers = "premium_users"
+    }
+}
+
+// MARK: - Location Details and Comments Models
+
+struct LocationDetailsResponse: Codable {
+    let success: Bool
+    let location: LocationDetails
+}
+
+struct LocationDetails: Codable {
+    let id: Int
+    let title: String
+    let description: String?
+    let latitude: Double
+    let longitude: Double
+    let address: String?
+    let viewsCount: Int
+    let likesCount: Int
+    let bookmarksCount: Int
+    let commentsCount: Int
+    let submissionDate: String
+    let featured: Bool
+    let categoryName: String?
+    let categoryIcon: String?
+    let categoryColor: String?
+    let dangerLevel: String?
+    let dangerColor: String?
+    let dangerDescription: String?
+    let riskLevel: Int?
+    let submittedByUsername: String?
+    let submittedByAvatar: String?
+    let images: [LocationImage]
+    let tags: [String]
+    let timeline: [TimelineEvent]
+    let userInteractions: UserInteractions
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, latitude, longitude, address, featured, tags, timeline, images
+        case viewsCount = "views_count"
+        case likesCount = "likes_count"
+        case bookmarksCount = "bookmarks_count"
+        case commentsCount = "comments_count"
+        case submissionDate = "submission_date"
+        case categoryName = "category_name"
+        case categoryIcon = "category_icon"
+        case categoryColor = "category_color"
+        case dangerLevel = "danger_level"
+        case dangerColor = "danger_color"
+        case dangerDescription = "danger_description"
+        case riskLevel = "risk_level"
+        case submittedByUsername = "submitted_by_username"
+        case submittedByAvatar = "submitted_by_avatar"
+        case userInteractions = "userInteractions"
+    }
+    
+    // Memberwise initializer for direct instantiation
+    init(id: Int, title: String, description: String?, latitude: Double, longitude: Double, address: String?, viewsCount: Int, likesCount: Int, bookmarksCount: Int, commentsCount: Int, submissionDate: String, featured: Bool, categoryName: String?, categoryIcon: String?, categoryColor: String?, dangerLevel: String?, dangerColor: String?, dangerDescription: String?, riskLevel: Int?, submittedByUsername: String?, submittedByAvatar: String?, images: [LocationImage], tags: [String], timeline: [TimelineEvent], userInteractions: UserInteractions) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.latitude = latitude
+        self.longitude = longitude
+        self.address = address
+        self.viewsCount = viewsCount
+        self.likesCount = likesCount
+        self.bookmarksCount = bookmarksCount
+        self.commentsCount = commentsCount
+        self.submissionDate = submissionDate
+        self.featured = featured
+        self.categoryName = categoryName
+        self.categoryIcon = categoryIcon
+        self.categoryColor = categoryColor
+        self.dangerLevel = dangerLevel
+        self.dangerColor = dangerColor
+        self.dangerDescription = dangerDescription
+        self.riskLevel = riskLevel
+        self.submittedByUsername = submittedByUsername
+        self.submittedByAvatar = submittedByAvatar
+        self.images = images
+        self.tags = tags
+        self.timeline = timeline
+        self.userInteractions = userInteractions
+    }
+    
+    // Custom initializer to handle latitude/longitude as strings
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(Int.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        
+        // Handle latitude - try string first, then double
+        if let latString = try? container.decode(String.self, forKey: .latitude) {
+            latitude = Double(latString) ?? 0.0
+        } else {
+            latitude = try container.decode(Double.self, forKey: .latitude)
+        }
+        
+        // Handle longitude - try string first, then double
+        if let lngString = try? container.decode(String.self, forKey: .longitude) {
+            longitude = Double(lngString) ?? 0.0
+        } else {
+            longitude = try container.decode(Double.self, forKey: .longitude)
+        }
+        
+        address = try container.decodeIfPresent(String.self, forKey: .address)
+        viewsCount = try container.decode(Int.self, forKey: .viewsCount)
+        likesCount = try container.decode(Int.self, forKey: .likesCount)
+        bookmarksCount = try container.decode(Int.self, forKey: .bookmarksCount)
+        commentsCount = try container.decode(Int.self, forKey: .commentsCount)
+        submissionDate = try container.decode(String.self, forKey: .submissionDate)
+        
+        // Handle featured as either Bool or Int
+        if let featuredBool = try? container.decode(Bool.self, forKey: .featured) {
+            featured = featuredBool
+        } else if let featuredInt = try? container.decode(Int.self, forKey: .featured) {
+            featured = featuredInt == 1
+        } else {
+            featured = false
+        }
+        
+        categoryName = try container.decodeIfPresent(String.self, forKey: .categoryName)
+        categoryIcon = try container.decodeIfPresent(String.self, forKey: .categoryIcon)
+        categoryColor = try container.decodeIfPresent(String.self, forKey: .categoryColor)
+        dangerLevel = try container.decodeIfPresent(String.self, forKey: .dangerLevel)
+        dangerColor = try container.decodeIfPresent(String.self, forKey: .dangerColor)
+        dangerDescription = try container.decodeIfPresent(String.self, forKey: .dangerDescription)
+        riskLevel = try container.decodeIfPresent(Int.self, forKey: .riskLevel)
+        submittedByUsername = try container.decodeIfPresent(String.self, forKey: .submittedByUsername)
+        submittedByAvatar = try container.decodeIfPresent(String.self, forKey: .submittedByAvatar)
+        images = try container.decode([LocationImage].self, forKey: .images)
+        tags = try container.decode([String].self, forKey: .tags)
+        timeline = try container.decode([TimelineEvent].self, forKey: .timeline)
+        userInteractions = try container.decode(UserInteractions.self, forKey: .userInteractions)
+    }
+}
+
+struct LocationImage: Codable {
+    let imageUrl: String
+    let thumbnailUrl: String?
+    let caption: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case imageUrl = "image_url"
+        case thumbnailUrl = "thumbnail_url"
+        case caption
+    }
+}
+
+struct TimelineEvent: Codable {
+    let eventType: String
+    let timestamp: String
+    let description: String
+    let username: String?
+    let avatar: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case eventType = "event_type"
+        case timestamp, description, username, avatar
+    }
+}
+
+struct UserInteractions: Codable {
+    let isLiked: Bool
+    let isBookmarked: Bool
+    let hasVisited: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case isLiked, isBookmarked, hasVisited
+    }
+}
+
+struct CommentsResponse: Codable {
+    let success: Bool
+    let comments: [Comment]
+    let pagination: CommentPagination
+}
+
+struct Comment: Codable, Identifiable {
+    let id: Int
+    let commentText: String
+    let likesCount: Int
+    let createdAt: String
+    let updatedAt: String
+    let parentCommentId: Int?
+    let userId: Int
+    let username: String
+    let avatar: String?
+    let replyCount: Int?
+    let replies: [Comment]?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, username, avatar, replies
+        case commentText = "comment_text"
+        case likesCount = "likes_count"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case parentCommentId = "parent_comment_id"
+        case userId = "user_id"
+        case replyCount = "reply_count"
+    }
+}
+
+struct CommentPagination: Codable {
+    let total: Int
+    let limit: Int
+    let offset: Int
+    let hasMore: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case total, limit, offset
+        case hasMore = "hasMore"
+    }
+}
+
+struct AddCommentRequest: Codable {
+    let commentText: String
+    let parentCommentId: Int?
+    
+    enum CodingKeys: String, CodingKey {
+        case commentText = "comment_text"
+        case parentCommentId = "parent_comment_id"
+    }
+}
+
+struct AddCommentResponse: Codable {
+    let success: Bool
+    let message: String
+    let comment: Comment
+}
+
+struct ToggleLikeResponse: Codable {
+    let success: Bool
+    let message: String
+    let isLiked: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case success, message
+        case isLiked = "isLiked"
+    }
+}
+
+struct ToggleBookmarkResponse: Codable {
+    let success: Bool
+    let message: String
+    let isBookmarked: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case success, message
+        case isBookmarked = "isBookmarked"
     }
 }

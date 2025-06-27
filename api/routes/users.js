@@ -160,6 +160,215 @@ router.put('/profile', [
 
 /**
  * @swagger
+ * /api/users/notifications:
+ *   get:
+ *     summary: Get user notifications
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: unread_only
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *     responses:
+ *       200:
+ *         description: List of user notifications
+ */
+router.get('/notifications', authenticateToken, [
+  query('unread_only').optional().isBoolean().toBoolean(),
+  query('limit').optional().isInt({ min: 1, max: 50 }).toInt(),
+  query('offset').optional().isInt({ min: 0 }).toInt()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: errors.array()
+      });
+    }
+
+    const { unread_only = false, limit = 20, offset = 0 } = req.query;
+
+    let whereClause = 'WHERE user_id = ?';
+    const params = [req.user.userId];
+
+    if (unread_only) {
+      whereClause += ' AND is_read = FALSE';
+    }
+
+    const [notifications] = await pool.execute(`
+      SELECT 
+        id, title, message, type, related_type, related_id, 
+        is_read, created_at
+      FROM notifications 
+      ${whereClause}
+      ORDER BY created_at DESC 
+      LIMIT ? OFFSET ?
+    `, [...params, limit, offset]);
+
+    // Get unread count
+    const [unreadCount] = await pool.execute(
+      'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE',
+      [req.user.userId]
+    );
+
+    res.json({
+      success: true,
+      notifications: notifications,
+      unreadCount: unreadCount[0].count,
+      hasMore: notifications.length === limit
+    });
+  } catch (error) {
+    console.error('Get notifications error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch notifications',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/users/notifications/{id}/read:
+ *   post:
+ *     summary: Mark notification as read
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Notification marked as read
+ */
+router.post('/notifications/:id/read', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify notification belongs to user
+    const [notification] = await pool.execute(
+      'SELECT id FROM notifications WHERE id = ? AND user_id = ?',
+      [id, req.user.userId]
+    );
+
+    if (notification.length === 0) {
+      return res.status(404).json({
+        error: 'Notification not found'
+      });
+    }
+
+    // Mark as read
+    await pool.execute(
+      'UPDATE notifications SET is_read = TRUE WHERE id = ?',
+      [id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Notification marked as read'
+    });
+  } catch (error) {
+    console.error('Mark notification read error:', error);
+    res.status(500).json({
+      error: 'Failed to mark notification as read',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/users/notifications/read-all:
+ *   post:
+ *     summary: Mark all notifications as read
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: All notifications marked as read
+ */
+router.post('/notifications/read-all', authenticateToken, async (req, res) => {
+  try {
+    await pool.execute(
+      'UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE',
+      [req.user.userId]
+    );
+
+    res.json({
+      success: true,
+      message: 'All notifications marked as read'
+    });
+  } catch (error) {
+    console.error('Mark all notifications read error:', error);
+    res.status(500).json({
+      error: 'Failed to mark all notifications as read',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/users/preferences:
+ *   get:
+ *     summary: Get user preferences
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User preferences
+ */
+router.get('/preferences', authenticateToken, async (req, res) => {
+  try {
+    const [preferences] = await pool.execute(
+      'SELECT preference_key, preference_value FROM user_preferences WHERE user_id = ?',
+      [req.user.userId]
+    );
+
+    // Convert to object format
+    const preferencesObject = {};
+    preferences.forEach(pref => {
+      try {
+        preferencesObject[pref.preference_key] = JSON.parse(pref.preference_value);
+      } catch {
+        preferencesObject[pref.preference_key] = pref.preference_value;
+      }
+    });
+
+    res.json({
+      success: true,
+      preferences: preferencesObject
+    });
+  } catch (error) {
+    console.error('Get preferences error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch preferences',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
  * /api/users/preferences:
  *   post:
  *     summary: Update user preferences
@@ -173,19 +382,72 @@ router.put('/profile', [
  *           schema:
  *             type: object
  *             properties:
- *               category_ids:
- *                 type: array
- *                 items:
- *                   type: integer
+ *               preferences:
+ *                 type: object
  *     responses:
  *       200:
- *         description: Preferences updated successfully
+ *         description: Preferences updated
  */
-router.post('/preferences', [
-  authenticateToken,
-  body('category_ids').isArray().custom((value) => {
-    return value.every(id => Number.isInteger(id) && id > 0);
-  })
+router.post('/preferences', authenticateToken, async (req, res) => {
+  try {
+    const { preferences } = req.body;
+
+    if (!preferences || typeof preferences !== 'object') {
+      return res.status(400).json({
+        error: 'Invalid preferences data'
+      });
+    }
+
+    // Update or insert preferences
+    for (const [key, value] of Object.entries(preferences)) {
+      const jsonValue = JSON.stringify(value);
+      
+      await pool.execute(`
+        INSERT INTO user_preferences (user_id, preference_key, preference_value)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE preference_value = VALUES(preference_value)
+      `, [req.user.userId, key, jsonValue]);
+    }
+
+    res.json({
+      success: true,
+      message: 'Preferences updated successfully'
+    });
+  } catch (error) {
+    console.error('Update preferences error:', error);
+    res.status(500).json({
+      error: 'Failed to update preferences',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/users/visited-locations:
+ *   get:
+ *     summary: Get user's visited locations
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *     responses:
+ *       200:
+ *         description: List of visited locations
+ */
+router.get('/visited-locations', authenticateToken, [
+  query('limit').optional().isInt({ min: 1, max: 50 }).toInt(),
+  query('offset').optional().isInt({ min: 0 }).toInt()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -196,32 +458,36 @@ router.post('/preferences', [
       });
     }
 
-    const { category_ids } = req.body;
+    const { limit = 20, offset = 0 } = req.query;
 
-    // Remove existing preferences
-    await pool.execute(
-      'DELETE FROM user_preferences WHERE user_id = ?',
-      [req.user.userId]
-    );
-
-    // Add new preferences
-    if (category_ids.length > 0) {
-      const values = category_ids.map(id => [req.user.userId, id]);
-      const placeholders = values.map(() => '(?, ?)').join(', ');
-      
-      await pool.execute(
-        `INSERT INTO user_preferences (user_id, category_id) VALUES ${placeholders}`,
-        values.flat()
-      );
-    }
+    const [visits] = await pool.execute(`
+      SELECT 
+        l.id, l.title, l.description, l.latitude, l.longitude, l.address,
+        lc.name as category_name, lc.icon as category_icon,
+        dl.name as danger_level, dl.color as danger_color,
+        lv.visited_at,
+        l.likes_count as like_count,
+        l.bookmarks_count as bookmark_count,
+        l.comments_count as comment_count,
+        l.views_count as view_count
+      FROM location_visits lv
+      JOIN locations l ON lv.location_id = l.id
+      LEFT JOIN location_categories lc ON l.category_id = lc.id
+      LEFT JOIN danger_levels dl ON l.danger_level_id = dl.id
+      WHERE lv.user_id = ? AND l.is_approved = TRUE
+      ORDER BY lv.visited_at DESC
+      LIMIT ? OFFSET ?
+    `, [req.user.userId, limit, offset]);
 
     res.json({
-      message: 'Preferences updated successfully'
+      success: true,
+      visitedLocations: visits,
+      hasMore: visits.length === limit
     });
   } catch (error) {
-    console.error('Update preferences error:', error);
+    console.error('Get visited locations error:', error);
     res.status(500).json({
-      error: 'Failed to update preferences',
+      error: 'Failed to fetch visited locations',
       message: error.message
     });
   }

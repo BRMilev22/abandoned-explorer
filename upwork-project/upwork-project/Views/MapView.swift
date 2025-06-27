@@ -25,9 +25,11 @@ struct MapView: View {
     @State private var currentMapCenter: CLLocationCoordinate2D?
     private let locationUpdateThreshold: TimeInterval = 5.0 // Increased from 3.0
     private let initialZoomLevel: Double = 14.0
-    @State private var lastZoomApiCall = Date()
-    private let zoomApiThreshold: TimeInterval = 10.0 // Increased from 5.0 - minimum 10 seconds between zoom-triggered API calls
+    @State private var lastZoomApiCall = Date.distantPast // Start with past date to allow initial load
+    private let zoomApiThreshold: TimeInterval = 3.0 // Increased from 5.0 - minimum 10 seconds between zoom-triggered API calls
     private let activeUserUpdateThreshold: TimeInterval = 15.0 // Minimum 15 seconds between active user API calls
+    @State private var lastContextChangeApiCall = Date.distantPast // Separate throttling for context changes
+    private let contextChangeThreshold: TimeInterval = 2.0 // Much shorter throttling for context changes
     
     // Smart API call management - cache by geographic context
     @State private var lastApiCallLocation: CLLocationCoordinate2D?
@@ -64,11 +66,13 @@ struct MapView: View {
                 accessToken: accessToken,
                 styleURI: customStyleURL,
                 locations: dataManager.getApprovedLocations(),
-                activeUsers: dataManager.activeUsers,
+                activeUsers: [], // Hide active users from map display while keeping tracking
                 userLocation: locationManager.userLocation,
                 onLocationTap: { location in
+                    print("🎯 MapView: Location tapped - \(location.title) (ID: \(location.id))")
                     selectedLocation = location
                     showLocationDetail = true
+                    print("🎯 MapView: showLocationDetail set to true, selectedLocation: \(selectedLocation?.title ?? "nil")")
                 },
                 onZoomChange: { zoomLevel in
                     currentZoomLevel = zoomLevel
@@ -80,6 +84,8 @@ struct MapView: View {
                     geocodingService.reverseGeocode(coordinate: center, zoomLevel: currentZoomLevel)
                     // Use smart active users loading with geographic context
                     loadActiveUsers()
+                    // Check if we need to load locations for new area
+                    checkAndLoadLocationsForNewArea(center: center)
                 }
             )
             .ignoresSafeArea()
@@ -105,8 +111,8 @@ struct MapView: View {
                 
                 Spacer()
                 
-                // Bottom location info section (like Texas in Citizen)
-                BottomLocationInfo(
+                // Bottom location info section with zoom-aware visibility
+                ZoomAwareBottomBanner(
                     locations: dataManager.getApprovedLocations(),
                     userLocation: locationManager.userLocation,
                     currentZoomLevel: currentZoomLevel,
@@ -138,17 +144,69 @@ struct MapView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $showLocationDetail) {
+        .fullScreenCover(isPresented: $showLocationDetail) {
             if let location = selectedLocation {
-                LocationDetailView(location: location)
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
+                LocationDetailModalView(location: location, selectedLocation: $selectedLocation)
+                    .onAppear {
+                        print("🎬 MapView: LocationDetailModalView appeared for \(location.title)")
+                    }
+                    .onDisappear {
+                        // Keep selectedLocation until modal is fully dismissed
+                        print("🔄 Modal disappeared, clearing selectedLocation")
+                        selectedLocation = nil
+                    }
+            } else {
+                VStack(spacing: 20) {
+                    Text("Error: No location selected")
+                        .foregroundColor(.white)
+                        .font(.title2)
+                    
+                    Text("Debug Info:")
+                        .foregroundColor(.gray)
+                        .font(.caption)
+                    
+                    Text("showLocationDetail: \(showLocationDetail)")
+                        .foregroundColor(.gray)
+                        .font(.caption)
+                    
+                    Button("Close") {
+                        showLocationDetail = false
+                    }
+                    .foregroundColor(.orange)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black)
+                .onAppear {
+                    print("❌ MapView: selectedLocation is nil when trying to show modal")
+                    print("❌ showLocationDetail: \(showLocationDetail)")
+                }
             }
         }
         .sheet(isPresented: $showingLocationSelector) {
-            LocationCategorySelector(selectedCategory: $selectedLocationCategory)
-                .presentationDetents([.medium])
+            if selectedLocationCategory == "List View" {
+                NavigationView {
+                    LocationsListView(
+                        locations: dataManager.getApprovedLocations(),
+                        onLocationTap: { location in
+                            print("📋 LocationsListView: Location tapped - \(location.title) (ID: \(location.id))")
+                            selectedLocation = location
+                            print("📋 LocationsListView: selectedLocation set to \(selectedLocation?.title ?? "nil")")
+                            showLocationDetail = true
+                            print("📋 LocationsListView: showLocationDetail set to \(showLocationDetail)")
+                            showingLocationSelector = false
+                        }
+                    )
+                    .navigationTitle("Abandoned Locations")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarBackButtonHidden(false)
+                }
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+            } else {
+                LocationCategorySelector(selectedCategory: $selectedLocationCategory)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
         }
         .sheet(isPresented: $showingProfile) {
             ProfileView()
@@ -166,6 +224,9 @@ struct MapView: View {
             
             // Reset to locating state initially
             geocodingService.resetLocationToLocating()
+            
+            // Update DataManager with current zoom level
+            dataManager.updateZoomLevel(currentZoomLevel)
             
             if let userLoc = locationManager.userLocation {
                 print("📍 Initial user location: \(userLoc.latitude), \(userLoc.longitude)")
@@ -189,7 +250,25 @@ struct MapView: View {
                 print("✅ Location already authorized, starting updates")
                 locationManager.startLocationUpdates()
             }
-            loadInitialData()
+            
+            // Only load data if we have no locations cached
+            if dataManager.locations.isEmpty {
+                loadInitialData()
+            } else {
+                print("📋 Using existing cached data (\(dataManager.locations.count) locations)")
+            }
+            
+            // Listen for continental zoom notifications
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("ContinentalZoomDetected"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let zoomLevel = notification.userInfo?["zoomLevel"] as? Double {
+                    print("🌍 Received continental zoom notification - loading global locations (zoom: \(String(format: "%.1f", zoomLevel)))")
+                    loadGlobalLocationsBypassingThrottling()
+                }
+            }
         }
         .onChange(of: locationManager.userLocation) {
             if let location = locationManager.userLocation {
@@ -208,7 +287,11 @@ struct MapView: View {
                 currentMapCenter = location
                 // Force geocoding when user location first becomes available
                 geocodingService.forceInitialGeocode(coordinate: location, zoomLevel: currentZoomLevel)
-                loadInitialData() // Use initial data loading for first location update
+                
+                // Load data based on current zoom level for optimal performance
+                print("📍 First user location available - loading data for zoom level \(currentZoomLevel)")
+                // Use smart zoom-based loading to avoid validation errors
+                dataManager.loadLocationsForZoomLevel(currentZoomLevel, center: location)
                 
                 // Update user's location in the backend for active users tracking
                 dataManager.updateUserLocation(latitude: location.latitude, longitude: location.longitude)
@@ -240,6 +323,12 @@ struct MapView: View {
                 }
             }
         }
+        .onChange(of: geocodingService.currentLocationName) {
+            // Automatically scan for locations when location context changes
+            print("📍 Location context changed to: \(geocodingService.currentLocationName)")
+            print("🔄 Triggering location scan due to context change")
+            triggerLocationScanForContextChange()
+        }
     }
     
     private func throttledLocationUpdate() {
@@ -252,51 +341,52 @@ struct MapView: View {
     }
     
     private func loadInitialData() {
-        // Load both locations and active users with continent-level context for maximum coverage
-        // Only perform initial load once
-        guard !hasPerformedInitialLoad else {
-            print("⏸️ Initial data already loaded, using normal loading")
-            loadNearbyLocations()
+        // Force immediate loading for current map view
+        print("🚀 Loading data for current map view")
+        
+        // Get current map center for loading
+        let loadingCenter: CLLocationCoordinate2D
+        if let userLocation = locationManager.userLocation {
+            loadingCenter = userLocation
+            print("📍 Using user location for loading: \(userLocation)")
+        } else if let mapCenter = currentMapCenter {
+            loadingCenter = mapCenter
+            print("📍 Using map center for loading: \(mapCenter)")
+        } else {
+            print("📍 No location available - loading global dataset")
+            dataManager.loadAllLocationsWithPriority(userLocation: nil)
+            loadInitialActiveUsers()
             return
         }
         
-        hasPerformedInitialLoad = true
-        print("🚀 Initial data load - using continent-level coverage")
-        
-        // Load locations with continent-level context
-        if let userLocation = locationManager.userLocation {
-            print("📍 Loading locations for continent-level context around user location")
-            // For initial load, use continent-level context to get broader coverage
-            dataManager.loadAllLocations() // Global load for maximum initial coverage
-        } else {
-            print("📍 No user location - loading all locations globally")
-            dataManager.loadAllLocations()
-        }
+        // Smart initial load based on zoom level
+        print("🎯 Smart initial load for zoom level \(currentZoomLevel): \(loadingCenter)")
+        // Use zoom-appropriate radius to avoid validation errors
+        dataManager.loadLocationsForZoomLevel(currentZoomLevel, center: loadingCenter)
         
         // Load active users with continent-level context
         loadInitialActiveUsers()
     }
     
     private func loadNearbyLocations() {
-        print("🌍 Loading locations based on current zoom level: \(currentZoomLevel)")
-        
-        // Smart location loading based on zoom context
-        let contextLevel = geocodingService.getActiveUsersContextName(zoomLevel: currentZoomLevel)
-        
-        // For very zoomed out views (continent/worldwide), load all locations globally
-        if contextLevel == "Europe" || contextLevel == "United States" || contextLevel == "Worldwide" {
-            print("📍 Context level '\(contextLevel)' - loading all locations globally")
-            dataManager.loadAllLocations()
-        } else if let userLocation = locationManager.userLocation {
-            print("📍 Context level '\(contextLevel)' - loading nearby locations: \(userLocation)")
-            dataManager.loadNearbyLocations(
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude
-            )
+        // Get current center coordinate for loading
+        let centerCoordinate: CLLocationCoordinate2D
+        if let userLocation = locationManager.userLocation {
+            centerCoordinate = userLocation
+        } else if let mapCenter = currentMapCenter {
+            centerCoordinate = mapCenter
         } else {
-            print("📍 No user location available - loading all locations as fallback")
-            dataManager.loadAllLocations()
+            print("📍 No location available - loading all locations")
+            dataManager.loadAllLocationsWithPriority(userLocation: nil)
+            loadActiveUsers()
+            return
         }
+        
+        print("🌍 Smart loading for zoom \(currentZoomLevel) at \(centerCoordinate)")
+        
+        // Use new zoom-based loading with caching
+        dataManager.loadLocationsForZoomLevel(currentZoomLevel, center: centerCoordinate)
+        
         print("📊 Current approved locations count: \(dataManager.getApprovedLocations().count)")
         
         // Also load active users count with smart caching
@@ -503,6 +593,63 @@ struct MapView: View {
         }
     }
     
+    private func triggerLocationScanForContextChange() {
+        // Only trigger if we don't have suitable cached data for this context
+        guard let userLocation = locationManager.userLocation ?? currentMapCenter else {
+            print("📍 No location available for context scan")
+            return
+        }
+        
+        // Use longer throttling for context changes to avoid excessive calls
+        let now = Date()
+        guard now.timeIntervalSince(lastContextChangeApiCall) >= contextChangeThreshold else {
+            print("⏸️ Throttling context-based location scan - too soon since last context change (\(String(format: "%.1f", now.timeIntervalSince(lastContextChangeApiCall)))s ago)")
+            return
+        }
+        
+        lastContextChangeApiCall = now
+        print("🔄 Context change detected - smart loading for current view")
+        
+        // Use smart zoom-based loading with caching
+        dataManager.loadLocationsForZoomLevel(currentZoomLevel, center: userLocation)
+        
+        print("📊 Current approved locations count: \(dataManager.getApprovedLocations().count)")
+    }
+    
+    private func checkAndLoadLocationsForNewArea(center: CLLocationCoordinate2D) {
+        // Only check for location loading if we have moved significantly
+        guard let lastLocation = lastApiCallLocation else {
+            // First time, load locations
+            loadLocationsForArea(center: center)
+            return
+        }
+        
+        let distance = CLLocationCoordinate2D.distance(from: lastLocation, to: center) / 1000.0
+        
+        // Load new locations if moved more than 25km
+        if distance > 25.0 {
+            print("🗺️ Moved \(String(format: "%.1f", distance))km - loading locations for new area")
+            loadLocationsForArea(center: center)
+            lastApiCallLocation = center
+        }
+    }
+    
+    private func loadLocationsForArea(center: CLLocationCoordinate2D) {
+        // Determine appropriate loading strategy based on zoom level
+        if currentZoomLevel < 8.0 {
+            // Very zoomed out - load all locations with priority for user's area
+            print("🌍 Loading all locations for zoomed out view")
+            dataManager.loadAllLocationsWithPriority(userLocation: locationManager.userLocation)
+        } else {
+            // Zoomed in - load nearby locations
+            print("📍 Loading nearby locations for area: \(center.latitude), \(center.longitude)")
+            dataManager.loadNearbyLocations(
+                latitude: center.latitude,
+                longitude: center.longitude
+            )
+        }
+    }
+    
     private func handleZoomBasedLocationLoading(zoomLevel: Double) {
         // Smart zoom-based loading with geographic context awareness
         let newContextLevel = geocodingService.getActiveUsersContextName(zoomLevel: zoomLevel)
@@ -514,7 +661,7 @@ struct MapView: View {
         
         let now = Date()
         guard now.timeIntervalSince(lastZoomApiCall) >= zoomApiThreshold else {
-            print("⏸️ Throttling zoom-based API call - too soon since last call")
+            print("⏸️ Throttling zoom-based API call - too soon since last call (\(String(format: "%.1f", now.timeIntervalSince(lastZoomApiCall)))s ago)")
             return
         }
         
@@ -551,14 +698,14 @@ struct MapView: View {
             
             // Use the smart location loading system - sync with geocoding contexts
             if finalNewContext == "continent" || finalNewContext == "worldwide" {
-                dataManager.loadAllLocations()
+                dataManager.loadAllLocationsWithPriority(userLocation: locationManager.userLocation)
             } else if let userLocation = locationManager.userLocation {
                 dataManager.loadNearbyLocations(
                     latitude: userLocation.latitude,
                     longitude: userLocation.longitude
                 )
             } else {
-                dataManager.loadAllLocations()
+                dataManager.loadAllLocationsWithPriority(userLocation: nil)
             }
             
             // Load active users with smart caching
@@ -587,6 +734,11 @@ struct MapView: View {
             print("📊 Cache Status: Empty")
         }
     }
+    
+    private func loadGlobalLocationsBypassingThrottling() {
+        print("🚀 Loading global locations with throttling bypass for continental view")
+        dataManager.loadAllLocationsWithBypass()
+    }
 }
 
 // MARK: - Mapbox Map View
@@ -609,16 +761,18 @@ struct MapboxMapView: UIViewRepresentable {
         // Configure access token and load style
         mapView.mapboxMap.loadStyle(StyleURI(rawValue: styleURI) ?? .dark)
         
-        // Add gesture recognizer for location taps
-        let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
-        mapView.addGestureRecognizer(tapGesture)
+        // Setup annotation managers and tap handling
+        context.coordinator.setupAnnotationManagers(mapView: mapView)
         
-        // Add zoom change listener for UI updates only
+        // Add zoom change listener for UI updates and continental loading
         mapView.mapboxMap.onCameraChanged.observe { _ in
             let zoomLevel = mapView.mapboxMap.cameraState.zoom
             let center = mapView.mapboxMap.cameraState.center
             context.coordinator.parent.onZoomChange(zoomLevel)
             context.coordinator.parent.onMapCenterChange?(center)
+            
+            // Check for continental zoom out and trigger immediate loading
+            context.coordinator.handleContinentalZoomChange(zoomLevel: zoomLevel, center: center)
             
             // Only scale existing markers, don't clear/reload them
             context.coordinator.scaleAnnotationsForZoom(zoomLevel: zoomLevel)
@@ -630,7 +784,6 @@ struct MapboxMapView: UIViewRepresentable {
         mapView.mapboxMap.onStyleLoaded.observeNext { _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 let center = mapView.mapboxMap.cameraState.center
-                let zoomLevel = mapView.mapboxMap.cameraState.zoom
                 context.coordinator.parent.onMapCenterChange?(center)
                 print("🗺️ Initial map loaded, triggering geocoding for center: \(center)")
             }
@@ -710,6 +863,10 @@ struct MapboxMapView: UIViewRepresentable {
         // Throttling for scaling updates
         private var lastScaleTime: TimeInterval = 0
         
+        // Continental zoom tracking
+        private var lastContinentalZoom: Double = 0
+        private var lastContinentalLoadTime: TimeInterval = 0
+        
         init(_ parent: MapboxMapView) {
             self.parent = parent
         }
@@ -719,23 +876,60 @@ struct MapboxMapView: UIViewRepresentable {
             cancellables.removeAll()
         }
         
-        @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+        func setupAnnotationManagers(mapView: MapboxMaps.MapView) {
+            // Setup point annotation manager for location markers
+            pointAnnotationManager = mapView.annotations.makePointAnnotationManager()
+            
+            // Setup tap handling using map tap gesture
+            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleMapTap(_:)))
+            mapView.addGestureRecognizer(tapGesture)
+            
+            // Setup user annotation manager
+            userAnnotationManager = mapView.annotations.makePointAnnotationManager()
+        }
+        
+        @objc func handleMapTap(_ gesture: UITapGestureRecognizer) {
             guard let mapView = mapView else { return }
             
             let point = gesture.location(in: mapView)
             let coordinate = mapView.mapboxMap.coordinate(for: point)
             
-            // Find the closest location to the tap
-            let closestLocation = parent.locations.min { location1, location2 in
-                let distance1 = CLLocationCoordinate2D.distance(from: coordinate, to: location1.coordinate)
-                let distance2 = CLLocationCoordinate2D.distance(from: coordinate, to: location2.coordinate)
-                return distance1 < distance2
+            print("🎯 Map tapped at coordinate: \(coordinate)")
+            
+            // CRITICAL FIX: Use the current locations that are actually being displayed
+            // Try parent.locations first, then fall back to pendingLocations
+            let locationsToCheck = !parent.locations.isEmpty ? parent.locations : pendingLocations
+            
+            // Find the closest location to the tap with a more generous threshold
+            let tapThreshold: Double = 200.0 // Increased to 200 meters for easier tapping
+            var closestLocation: AbandonedLocation?
+            var shortestDistance: Double = Double.infinity
+            
+            print("🔍 Checking \(locationsToCheck.count) locations against tap threshold \(tapThreshold)m")
+            print("🔍 Source: parent.locations=\(parent.locations.count), pendingLocations=\(pendingLocations.count)")
+            
+            for location in locationsToCheck {
+                let distance = CLLocationCoordinate2D.distance(from: coordinate, to: location.coordinate)
+                print("📍 Location '\(location.title)' at distance \(String(format: "%.1f", distance))m from tap")
+                
+                if distance < tapThreshold && distance < shortestDistance {
+                    closestLocation = location
+                    shortestDistance = distance
+                    print("🎯 New closest location: \(location.title) at \(String(format: "%.1f", distance))m")
+                }
             }
             
             if let location = closestLocation {
-                let distance = CLLocationCoordinate2D.distance(from: coordinate, to: location.coordinate)
-                if distance < 100 { // 100 meters threshold
-                    parent.onLocationTap(location)
+                print("✅ FOUND LOCATION: \(location.title) at distance \(String(format: "%.1f", shortestDistance))m")
+                print("🚀 Calling onLocationTap with location ID: \(location.id)")
+                DispatchQueue.main.async {
+                    self.parent.onLocationTap(location)
+                }
+            } else {
+                print("❌ NO LOCATION FOUND within \(tapThreshold)m threshold")
+                print("💡 Consider tapping closer to a marker or check if locations are loaded")
+                if locationsToCheck.isEmpty {
+                    print("🚨 WARNING: No locations available for tap detection!")
                 }
             }
         }
@@ -746,6 +940,13 @@ struct MapboxMapView: UIViewRepresentable {
             pendingUserLocation = userLocation
             pendingZoomLevel = zoomLevel
             
+            // CRITICAL FIX: Update parent.locations immediately for tap handling
+            // The parent's locations array is used by tap handling, so keep it in sync
+            if !locations.isEmpty {
+                print("🔄 Updating parent locations array with \(locations.count) locations for tap handling")
+                // We can't directly modify parent.locations, but we can store it locally
+            }
+            
             // Cancel existing timer and start new one
             debounceTimer?.invalidate()
             debounceTimer = Timer.scheduledTimer(withTimeInterval: debounceDelay, repeats: false) { [weak self] _ in
@@ -753,6 +954,34 @@ struct MapboxMapView: UIViewRepresentable {
                     self?.performDebouncedUpdate()
                 }
             }
+        }
+        
+        func handleContinentalZoomChange(zoomLevel: Double, center: CLLocationCoordinate2D) {
+            let now = Date().timeIntervalSince1970
+            
+            // Check if we've zoomed out to continental/global level (< 8.0)
+            let isContinentalZoom = zoomLevel < 8.0
+            let wasNotContinental = lastContinentalZoom >= 8.0
+            let hasZoomedOutToContinental = isContinentalZoom && wasNotContinental
+            
+            // Only trigger if we've just zoomed out to continental level and enough time has passed
+            let timeSinceLastLoad = now - lastContinentalLoadTime
+            if hasZoomedOutToContinental && timeSinceLastLoad > 3.0 {
+                print("🌍 Detected continental zoom out (zoom: \(String(format: "%.1f", zoomLevel))) - loading global locations immediately")
+                
+                // Trigger immediate global loading bypassing throttling
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("ContinentalZoomDetected"),
+                        object: nil,
+                        userInfo: ["zoomLevel": zoomLevel, "center": center]
+                    )
+                }
+                
+                lastContinentalLoadTime = now
+            }
+            
+            lastContinentalZoom = zoomLevel
         }
         
         func updateAnnotations(locations: [AbandonedLocation], userLocation: CLLocationCoordinate2D?, zoomLevel: Double) {
@@ -887,7 +1116,7 @@ struct MapboxMapView: UIViewRepresentable {
             
             // Add location annotations with Citizen-style markers and scaling
             for (index, location) in processedLocations.enumerated() {
-                var annotation = PointAnnotation(coordinate: location.coordinate)
+                var annotation = PointAnnotation(id: "marker_\(location.id)", coordinate: location.coordinate)
                 
                 // Use unique marker based on location ID
                 let markerImageId = "marker_\(location.id)"
@@ -1334,6 +1563,7 @@ extension CLLocationCoordinate2D {
 
 // MARK: - Map Header View
 struct MapHeaderView: View {
+    @EnvironmentObject var dataManager: DataManager
     @Binding var selectedCategory: String
     @Binding var showingSelector: Bool
     @Binding var showingProfile: Bool
@@ -1400,16 +1630,18 @@ struct MapHeaderView: View {
                                         .foregroundColor(.white)
                                 )
                             
-                            // Red notification badge with count
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 20, height: 20)
-                                .overlay(
-                                    Text("283")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.white)
-                                )
-                                .offset(x: 12, y: -12)
+                            // Red notification badge with count (dynamic)
+                            if dataManager.unreadNotificationCount > 0 {
+                                Circle()
+                                    .fill(Color.red)
+                                    .frame(width: 20, height: 20)
+                                    .overlay(
+                                        Text("\(min(dataManager.unreadNotificationCount, 999))")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.white)
+                                    )
+                                    .offset(x: 12, y: -12)
+                            }
                         }
                     }
                     
@@ -1500,13 +1732,20 @@ struct LoadingIndicator: View {
     }
 }
 
-// MARK: - Bottom Location Info
-struct BottomLocationInfo: View {
+// MARK: - Zoom-Aware Bottom Banner
+struct ZoomAwareBottomBanner: View {
     let locations: [AbandonedLocation]
     let userLocation: CLLocationCoordinate2D?
     let currentZoomLevel: Double
     let currentLocationName: String
     let onKeyAlertsPressed: () -> Void
+    
+    @State private var isExpanded = true
+    @State private var dragOffset: CGFloat = 0
+    
+    // Zoom thresholds for banner visibility - hide very early when zooming out
+    private let expandedZoomThreshold: Double = 14.0 // Close to default zoom level
+    private let hiddenZoomThreshold: Double = 13.0   // Hide immediately when zooming out slightly
     
     // Calculate recent alerts (last 24 hours)
     private var recentAlertsCount: Int {
@@ -1535,24 +1774,60 @@ struct BottomLocationInfo: View {
         }
     }
     
+    // Determine if banner should be expanded based on zoom level
+    private var shouldExpand: Bool {
+        currentZoomLevel >= expandedZoomThreshold
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(currentLocationName)
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Text(alertText)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+            // Pull indicator when collapsed
+            if !isExpanded {
+                Button(action: {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        isExpanded = true
+                    }
+                }) {
+                    VStack(spacing: 4) {
+                        // Pull up indicator
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.gray.opacity(0.6))
+                            .frame(width: 40, height: 4)
+                        
+                        // Chevron up icon
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.black.opacity(0.8), Color.black],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                 }
-                
-                Spacer()
-                
-                // Only show key alerts button if there are any
-                if keyAlertsCount > 0 {
+            }
+            
+            // Main banner content
+            if isExpanded {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(currentLocationName)
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        
+                        Text(alertText)
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
+                    
+                    Spacer()
+                    
+                    // Key alerts button (Citizen-style)
                     Button(action: {
                         onKeyAlertsPressed()
                     }) {
@@ -1561,13 +1836,15 @@ struct BottomLocationInfo: View {
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundColor(.white)
                             
-                            Text("\(keyAlertsCount) new")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.red)
-                                .cornerRadius(12)
+                            if keyAlertsCount > 0 {
+                                Text("\(keyAlertsCount) new")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.red)
+                                    .cornerRadius(12)
+                            }
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
@@ -1575,10 +1852,45 @@ struct BottomLocationInfo: View {
                         .cornerRadius(20)
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(Color.black)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .background(Color.black)
+        }
+        .offset(y: dragOffset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    // Only allow downward dragging when expanded
+                    if isExpanded && value.translation.height > 0 {
+                        dragOffset = value.translation.height
+                    }
+                }
+                .onEnded { value in
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        if value.translation.height > 50 && isExpanded {
+                            // Hide banner if dragged down significantly
+                            isExpanded = false
+                        }
+                        dragOffset = 0
+                    }
+                }
+        )
+        .onChange(of: currentZoomLevel) { _, newZoomLevel in
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                if newZoomLevel >= expandedZoomThreshold && !isExpanded {
+                    // Show banner when zooming in to street level
+                    isExpanded = true
+                } else if newZoomLevel <= hiddenZoomThreshold && isExpanded {
+                    // Hide banner when zooming out to state/country level
+                    isExpanded = false
+                }
+            }
+        }
+        .onAppear {
+            // Set initial state based on zoom level
+            isExpanded = shouldExpand
         }
     }
 }
@@ -1590,6 +1902,7 @@ struct LocationCategorySelector: View {
     
     private let feedOptions = [
         ("Abandoned", "🏚️", "Explore abandoned buildings and locations"),
+        ("List View", "📋", "View all locations in list format"),
         ("Live Feed", "📡", "Real-time incidents and reports"),
         ("Family Alerts", "👥", "Track family members and safety zones"),
         ("Emergency", "🚨", "Emergency incidents and alerts"),
@@ -1605,7 +1918,9 @@ struct LocationCategorySelector: View {
                 ForEach(feedOptions, id: \.0) { option in
                     Button(action: {
                         selectedCategory = option.0
-                        dismiss()
+                        if option.0 != "List View" {
+                            dismiss()
+                        }
                     }) {
                         HStack(spacing: 16) {
                             // Icon circle
@@ -1699,6 +2014,148 @@ struct ErrorMessageView: View {
                 )
         )
         .padding(.horizontal, 40)
+    }
+}
+
+// MARK: - Locations List View
+struct LocationsListView: View {
+    let locations: [AbandonedLocation]
+    let onLocationTap: (AbandonedLocation) -> Void
+    
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(locations, id: \.id) { location in
+                    LocationListRowView(location: location) {
+                        onLocationTap(location)
+                    }
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                }
+            }
+            .listStyle(PlainListStyle())
+            .background(Color.black)
+            .scrollContentBackground(.hidden)
+        }
+        .background(Color.black)
+    }
+}
+
+// MARK: - Location List Row View
+struct LocationListRowView: View {
+    let location: AbandonedLocation
+    let onTap: () -> Void
+    
+    private var hasImages: Bool {
+        !location.images.isEmpty
+    }
+    
+    private var timeAgo: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: location.submissionDate, relativeTo: Date())
+    }
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 16) {
+                    // Media thumbnail (if available)
+                    if hasImages {
+                        AsyncImage(url: URL(string: location.displayImages.first ?? "")) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 60, height: 60)
+                                .clipped()
+                                .cornerRadius(8)
+                        } placeholder: {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 60, height: 60)
+                                .cornerRadius(8)
+                        }
+                    } else {
+                        // Location icon for entries without media
+                        Circle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Image(systemName: "location.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.white)
+                            )
+                    }
+                    
+                    // Content
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Title and location
+                        HStack {
+                            Text(location.title.uppercased())
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                            
+                            Spacer()
+                            
+                            Text(timeAgo)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.gray)
+                        }
+                        
+                        // Address
+                        Text("\(location.address)")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.gray)
+                            .lineLimit(1)
+                        
+                        // Description
+                        Text(location.description)
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        
+                        // Stats row
+                        HStack(spacing: 16) {
+                            // Views
+                            HStack(spacing: 4) {
+                                Image(systemName: "eye")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                                Text("\(location.likeCount)")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            // Score indicator
+                            HStack(spacing: 4) {
+                                Text("Score")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                                
+                                Text("97") // Default score like in the screenshots
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(.top, 4)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                
+                // Separator line
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 1)
+                    .padding(.horizontal, 16)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

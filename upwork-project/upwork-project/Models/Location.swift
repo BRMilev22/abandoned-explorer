@@ -252,3 +252,217 @@ enum DangerLevel: String, CaseIterable, Codable {
         }
     }
 }
+
+// MARK: - Dynamic Data Models
+
+struct DynamicCategory: Identifiable, Codable, Equatable {
+    let id: Int
+    let name: String
+    let icon: String
+    let description: String?
+    let color: String
+    let isActive: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name, icon, description, color
+        case isActive = "is_active"
+    }
+}
+
+struct DynamicDangerLevel: Identifiable, Codable, Equatable {
+    let id: Int
+    let name: String
+    let color: String
+    let description: String?
+    let riskLevel: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name, color, description
+        case riskLevel = "risk_level"
+    }
+}
+
+struct DynamicTag: Identifiable, Codable, Equatable {
+    let id: Int
+    let name: String
+    let usageCount: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case usageCount = "usage_count"
+    }
+}
+
+struct LocationNotification: Identifiable, Codable {
+    let id: Int
+    let title: String
+    let message: String
+    let type: NotificationType
+    let relatedType: String?
+    let relatedId: Int?
+    let isRead: Bool
+    let createdAt: Date
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title, message, type
+        case relatedType = "related_type"
+        case relatedId = "related_id"
+        case isRead = "is_read"
+        case createdAt = "created_at"
+    }
+}
+
+enum NotificationType: String, Codable, CaseIterable {
+    case like = "like"
+    case comment = "comment"
+    case bookmark = "bookmark"
+    case approval = "approval"
+    case system = "system"
+    case visit = "visit"
+    
+    var icon: String {
+        switch self {
+        case .like: return "heart.fill"
+        case .comment: return "message.fill"
+        case .bookmark: return "bookmark.fill"
+        case .approval: return "checkmark.seal.fill"
+        case .system: return "gear.fill"
+        case .visit: return "location.fill"
+        }
+    }
+    
+    var color: String {
+        switch self {
+        case .like: return "red"
+        case .comment: return "blue"
+        case .bookmark: return "orange"
+        case .approval: return "green"
+        case .system: return "gray"
+        case .visit: return "purple"
+        }
+    }
+}
+
+struct UserPreferences: Codable {
+    var notificationsEnabled: Bool = true
+    var pushNotificationsEnabled: Bool = true
+    var locationTrackingEnabled: Bool = true
+    var showDangerousLocations: Bool = true
+    var preferredCategories: [Int] = []
+    var mapStyle: String = "standard"
+    var autoPlayVideos: Bool = false
+    var shareLocationData: Bool = false
+    
+    enum CodingKeys: String, CodingKey {
+        case notificationsEnabled = "notifications_enabled"
+        case pushNotificationsEnabled = "push_notifications_enabled"
+        case locationTrackingEnabled = "location_tracking_enabled"
+        case showDangerousLocations = "show_dangerous_locations"
+        case preferredCategories = "preferred_categories"
+        case mapStyle = "map_style"
+        case autoPlayVideos = "auto_play_videos"
+        case shareLocationData = "share_location_data"
+    }
+}
+
+struct LocationStats: Codable {
+    let totals: TotalStats
+    let categories: [CategoryStats]
+    let dangerLevels: [DangerLevelStats]
+}
+
+struct TotalStats: Codable {
+    let totalLocations: Int
+    let approvedLocations: Int
+    let pendingLocations: Int
+    let totalLikes: Int
+    let totalBookmarks: Int
+    let totalViews: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case totalLocations = "total_locations"
+        case approvedLocations = "approved_locations"
+        case pendingLocations = "pending_locations"
+        case totalLikes = "total_likes"
+        case totalBookmarks = "total_bookmarks"
+        case totalViews = "total_views"
+    }
+}
+
+struct CategoryStats: Codable {
+    let categoryName: String
+    let categoryIcon: String
+    let categoryColor: String
+    let locationCount: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case categoryName = "category_name"
+        case categoryIcon = "category_icon"
+        case categoryColor = "category_color"
+        case locationCount = "location_count"
+    }
+}
+
+struct DangerLevelStats: Codable {
+    let dangerLevel: String
+    let dangerColor: String
+    let locationCount: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case dangerLevel = "danger_level"
+        case dangerColor = "danger_color"
+        case locationCount = "location_count"
+    }
+}
+
+// MARK: - API Response Models
+
+struct CategoriesResponse: Codable {
+    let success: Bool
+    let categories: [DynamicCategory]
+}
+
+struct DangerLevelsResponse: Codable {
+    let success: Bool
+    let dangerLevels: [DynamicDangerLevel]
+}
+
+struct TagsResponse: Codable {
+    let success: Bool
+    let tags: [DynamicTag]
+}
+
+struct NotificationsResponse: Codable {
+    let success: Bool
+    let notifications: [LocationNotification]
+    let unreadCount: Int
+    let hasMore: Bool
+}
+
+struct PreferencesResponse: Codable {
+    let success: Bool
+    let preferences: UserPreferences
+}
+
+struct StatsResponse: Codable {
+    let success: Bool
+    let stats: LocationStats
+}
+
+struct VisitedLocationsResponse: Codable {
+    let success: Bool
+    let visitedLocations: [AbandonedLocation]
+    let hasMore: Bool
+}
+
+struct VisitResponse: Codable {
+    let success: Bool
+    let message: String
+    let viewCount: Int
+}
+
+// Additional API response types
+struct APISuccessResponse: Codable {
+    let success: Bool
+    let message: String
+}

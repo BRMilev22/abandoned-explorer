@@ -15,8 +15,8 @@ struct SubmitLocationView: View {
     @State private var currentStep = 0
     @State private var title = ""
     @State private var description = ""
-    @State private var selectedCategory: LocationCategory = .other
-    @State private var selectedDangerLevel: DangerLevel = .safe
+    @State private var selectedCategoryId: Int = 8 // Default to "Other"
+    @State private var selectedDangerLevelId: Int = 1 // Default to "Safe"
     @State private var tags = ""
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var photoImages: [UIImage] = []
@@ -46,8 +46,8 @@ struct SubmitLocationView: View {
                     
                     // Step 2: Details
                     DetailsStep(
-                        selectedCategory: $selectedCategory,
-                        selectedDangerLevel: $selectedDangerLevel,
+                        selectedCategoryId: $selectedCategoryId,
+                        selectedDangerLevelId: $selectedDangerLevelId,
                         tags: $tags
                     )
                     .tag(1)
@@ -70,8 +70,8 @@ struct SubmitLocationView: View {
                     ReviewStep(
                         title: title,
                         description: description,
-                        category: selectedCategory,
-                        dangerLevel: selectedDangerLevel,
+                        categoryId: selectedCategoryId,
+                        dangerLevelId: selectedDangerLevelId,
                         tags: tags,
                         photoImages: photoImages,
                         location: locationString
@@ -182,14 +182,22 @@ struct SubmitLocationView: View {
         
         let tagArray = tags.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         
+        // Find category and danger level by ID
+        let selectedCategory = dataManager.dynamicCategories.first { $0.id == selectedCategoryId }
+        let selectedDangerLevel = dataManager.dynamicDangerLevels.first { $0.id == selectedDangerLevelId }
+        
+        // Use fallback enum values if dynamic data isn't loaded
+        let categoryEnum: LocationCategory = LocationCategory(rawValue: selectedCategory?.name ?? "Other") ?? .other
+        let dangerEnum: DangerLevel = DangerLevel(rawValue: selectedDangerLevel?.name ?? "Safe") ?? .safe
+        
         dataManager.submitLocation(
             title: title,
             description: description,
             latitude: latitude,
             longitude: longitude,
             address: locationString.isEmpty ? "Lat: \(latitude), Lng: \(longitude)" : locationString,
-            category: selectedCategory,
-            dangerLevel: selectedDangerLevel,
+            category: categoryEnum,
+            dangerLevel: dangerEnum,
             tags: tagArray,
             images: photoImages
         )
@@ -199,8 +207,8 @@ struct SubmitLocationView: View {
         currentStep = 0
         title = ""
         description = ""
-        selectedCategory = .other
-        selectedDangerLevel = .safe
+        selectedCategoryId = 8
+        selectedDangerLevelId = 1
         tags = ""
         selectedPhotos = []
         photoImages = []
@@ -286,9 +294,10 @@ struct BasicInfoStep: View {
 }
 
 struct DetailsStep: View {
-    @Binding var selectedCategory: LocationCategory
-    @Binding var selectedDangerLevel: DangerLevel
+    @Binding var selectedCategoryId: Int
+    @Binding var selectedDangerLevelId: Int
     @Binding var tags: String
+    @EnvironmentObject var dataManager: DataManager
     
     var body: some View {
         ScrollView {
@@ -303,13 +312,20 @@ struct DetailsStep: View {
                         .font(.headline)
                         .foregroundColor(.white)
                     
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
-                        ForEach(LocationCategory.allCases, id: \.self) { category in
-                            CategoryButton(
-                                category: category,
-                                isSelected: selectedCategory == category
-                            ) {
-                                selectedCategory = category
+                    if dataManager.dynamicCategories.isEmpty {
+                        ProgressView("Loading categories...")
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding()
+                    } else {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
+                            ForEach(dataManager.dynamicCategories) { category in
+                                DynamicCategoryButton(
+                                    category: category,
+                                    isSelected: selectedCategoryId == category.id
+                                ) {
+                                    selectedCategoryId = category.id
+                                }
                             }
                         }
                     }
@@ -320,13 +336,20 @@ struct DetailsStep: View {
                         .font(.headline)
                         .foregroundColor(.white)
                     
-                    HStack(spacing: 12) {
-                        ForEach(DangerLevel.allCases, id: \.self) { level in
-                            DangerButton(
-                                level: level,
-                                isSelected: selectedDangerLevel == level
-                            ) {
-                                selectedDangerLevel = level
+                    if dataManager.dynamicDangerLevels.isEmpty {
+                        ProgressView("Loading danger levels...")
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding()
+                    } else {
+                        HStack(spacing: 12) {
+                            ForEach(dataManager.dynamicDangerLevels) { level in
+                                DynamicDangerButton(
+                                    level: level,
+                                    isSelected: selectedDangerLevelId == level.id
+                                ) {
+                                    selectedDangerLevelId = level.id
+                                }
                             }
                         }
                     }
@@ -336,6 +359,12 @@ struct DetailsStep: View {
                     Text("Tags (comma separated)")
                         .font(.headline)
                         .foregroundColor(.white)
+                    
+                    if !dataManager.dynamicTags.isEmpty {
+                        Text("Popular tags: \(dataManager.dynamicTags.prefix(5).map(\.name).joined(separator: ", "))")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
                     
                     TextField("e.g., creepy, photography, urban exploration", text: $tags)
                         .textFieldStyle(CustomTextFieldStyle())
@@ -493,11 +522,20 @@ struct LocationStep: View {
 struct ReviewStep: View {
     let title: String
     let description: String
-    let category: LocationCategory
-    let dangerLevel: DangerLevel
+    let categoryId: Int
+    let dangerLevelId: Int
     let tags: String
     let photoImages: [UIImage]
     let location: String
+    @EnvironmentObject var dataManager: DataManager
+    
+    private var selectedCategoryName: String {
+        dataManager.dynamicCategories.first { $0.id == categoryId }?.name ?? "Unknown"
+    }
+    
+    private var selectedDangerLevelName: String {
+        dataManager.dynamicDangerLevels.first { $0.id == dangerLevelId }?.name ?? "Unknown"
+    }
     
     var body: some View {
         ScrollView {
@@ -509,8 +547,8 @@ struct ReviewStep: View {
                 
                 VStack(alignment: .leading, spacing: 16) {
                     ReviewItem(title: "Title", value: title)
-                    ReviewItem(title: "Category", value: category.rawValue)
-                    ReviewItem(title: "Safety Level", value: dangerLevel.rawValue)
+                    ReviewItem(title: "Category", value: selectedCategoryName)
+                    ReviewItem(title: "Safety Level", value: selectedDangerLevelName)
                     ReviewItem(title: "Description", value: description)
                     ReviewItem(title: "Tags", value: tags)
                     ReviewItem(title: "Location", value: location)
@@ -615,52 +653,61 @@ struct NavigationButtons: View {
     }
 }
 
-struct CategoryButton: View {
-    let category: LocationCategory
+struct DynamicCategoryButton: View {
+    let category: DynamicCategory
     let isSelected: Bool
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
-            VStack {
+            VStack(spacing: 8) {
                 Image(systemName: category.icon)
                     .font(.title2)
-                Text(category.rawValue)
+                    .foregroundColor(isSelected ? .black : Color(hex: category.color))
+                
+                Text(category.name)
                     .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(isSelected ? .black : .white)
             }
-            .foregroundColor(isSelected ? .black : .white)
-            .padding()
-            .background(isSelected ? Color.orange : Color.gray.opacity(0.2))
-            .cornerRadius(12)
             .frame(maxWidth: .infinity)
+            .frame(height: 80)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? Color(hex: category.color) : Color.gray.opacity(0.2))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(hex: category.color), lineWidth: isSelected ? 2 : 1)
+            )
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
-struct DangerButton: View {
-    let level: DangerLevel
+struct DynamicDangerButton: View {
+    let level: DynamicDangerLevel
     let isSelected: Bool
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
-            Text(level.rawValue)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(isSelected ? .black : .white)
-                .padding()
-                .background(isSelected ? levelColor : Color.gray.opacity(0.2))
-                .cornerRadius(12)
-                .frame(maxWidth: .infinity)
+            Text(level.name)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(isSelected ? .black : Color(hex: level.color))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isSelected ? Color(hex: level.color) : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(hex: level.color), lineWidth: 1)
+                )
         }
-    }
-    
-    private var levelColor: Color {
-        switch level {
-        case .safe: return .green
-        case .caution: return .yellow
-        case .dangerous: return .red
-        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
@@ -678,4 +725,32 @@ struct CustomTextFieldStyle: TextFieldStyle {
     SubmitLocationView()
         .environmentObject(DataManager())
         .environmentObject(LocationManager())
+}
+
+// Helper extension for hex colors
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue:  Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
 }

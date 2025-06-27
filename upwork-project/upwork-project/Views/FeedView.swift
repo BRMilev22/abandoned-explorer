@@ -107,9 +107,9 @@ struct FeedView: View {
                 dataManager.loadAllLocations()
             }
         }
-        .sheet(isPresented: $showLocationDetail) {
+        .fullScreenCover(isPresented: $showLocationDetail) {
             if let location = selectedLocation, isValidLocationData(location) {
-                LocationDetailView(location: location)
+                LocationDetailModalView(location: location, selectedLocation: $selectedLocation)
             } else {
                 // Fallback view if location data is invalid
                 VStack(spacing: 20) {

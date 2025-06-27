@@ -30,7 +30,8 @@ const authenticateToken = async (req, res, next) => {
     }
 
     req.user = {
-      userId: decoded.userId,
+      id: decoded.userId,        // For consistent access via req.user.id
+      userId: decoded.userId,    // For backward compatibility
       username: decoded.username,
       isPremium: users[0].is_premium
     };

@@ -2,8 +2,22 @@ const express = require('express');
 const { body, query, validationResult } = require('express-validator');
 const { pool } = require('../config/database');
 const { authenticateToken, requirePremium } = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
 
 const router = express.Router();
+
+// Helper function to create notifications
+async function createNotification(userId, title, message, type, relatedType = null, relatedId = null) {
+  try {
+    await pool.execute(
+      'INSERT INTO notifications (user_id, title, message, type, related_type, related_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [userId, title, message, type, relatedType, relatedId]
+    );
+  } catch (error) {
+    console.error('Failed to create notification:', error);
+    // Don't throw error - notifications are not critical
+  }
+}
 
 /**
  * @swagger
@@ -74,6 +88,193 @@ const router = express.Router();
  *       200:
  *         description: List of nearby locations
  */
+// Add specific routes before parameterized routes
+
+/**
+ * @swagger
+ * /api/locations/categories:
+ *   get:
+ *     summary: Get all location categories
+ *     tags: [Locations]
+ *     responses:
+ *       200:
+ *         description: List of location categories
+ */
+router.get('/categories', async (req, res) => {
+  try {
+    const [categories] = await pool.execute(
+      'SELECT id, name, icon, description, color, is_active FROM location_categories WHERE is_active = TRUE ORDER BY name'
+    );
+
+    res.json({
+      success: true,
+      categories: categories
+    });
+  } catch (error) {
+    console.error('Get categories error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch categories',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/locations/danger-levels:
+ *   get:
+ *     summary: Get all danger levels
+ *     tags: [Locations]
+ *     responses:
+ *       200:
+ *         description: List of danger levels
+ */
+router.get('/danger-levels', async (req, res) => {
+  try {
+    const [dangerLevels] = await pool.execute(
+      'SELECT id, name, color, description, risk_level FROM danger_levels ORDER BY risk_level'
+    );
+
+    res.json({
+      success: true,
+      dangerLevels: dangerLevels
+    });
+  } catch (error) {
+    console.error('Get danger levels error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch danger levels',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/locations/tags:
+ *   get:
+ *     summary: Get all available tags
+ *     tags: [Locations]
+ *     parameters:
+ *       - in: query
+ *         name: popular
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: Return only popular tags (usage_count > 0)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *     responses:
+ *       200:
+ *         description: List of tags
+ */
+router.get('/tags', [
+  query('popular').optional().isBoolean().toBoolean(),
+  query('limit').optional().isInt({ min: 1, max: 100 }).toInt()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: errors.array()
+      });
+    }
+
+    const { popular = false, limit = 50 } = req.query;
+
+    let whereClause = '';
+    if (popular) {
+      whereClause = 'WHERE usage_count > 0';
+    }
+
+    const [tags] = await pool.execute(
+      `SELECT id, name, usage_count FROM tags ${whereClause} ORDER BY usage_count DESC, name ASC LIMIT ?`,
+      [limit]
+    );
+
+    res.json({
+      success: true,
+      tags: tags
+    });
+  } catch (error) {
+    console.error('Get tags error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch tags',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/locations/stats:
+ *   get:
+ *     summary: Get location statistics
+ *     tags: [Locations]
+ *     responses:
+ *       200:
+ *         description: Location statistics
+ */
+router.get('/stats', async (req, res) => {
+  try {
+    // Get total counts
+    const [totalStats] = await pool.execute(`
+      SELECT 
+        COUNT(*) as total_locations,
+        SUM(CASE WHEN is_approved = TRUE THEN 1 ELSE 0 END) as approved_locations,
+        SUM(CASE WHEN is_approved = FALSE THEN 1 ELSE 0 END) as pending_locations,
+        SUM(likes_count) as total_likes,
+        SUM(bookmarks_count) as total_bookmarks,
+        SUM(views_count) as total_views
+      FROM locations
+    `);
+
+    // Get category breakdown
+    const [categoryStats] = await pool.execute(`
+      SELECT 
+        lc.name as category_name,
+        lc.icon as category_icon,
+        lc.color as category_color,
+        COUNT(l.id) as location_count
+      FROM location_categories lc
+      LEFT JOIN locations l ON lc.id = l.category_id AND l.is_approved = TRUE
+      WHERE lc.is_active = TRUE
+      GROUP BY lc.id, lc.name, lc.icon, lc.color
+      ORDER BY location_count DESC
+    `);
+
+    // Get danger level breakdown
+    const [dangerStats] = await pool.execute(`
+      SELECT 
+        dl.name as danger_level,
+        dl.color as danger_color,
+        COUNT(l.id) as location_count
+      FROM danger_levels dl
+      LEFT JOIN locations l ON dl.id = l.danger_level_id AND l.is_approved = TRUE
+      GROUP BY dl.id, dl.name, dl.color
+      ORDER BY dl.risk_level
+    `);
+
+    res.json({
+      success: true,
+      stats: {
+        totals: totalStats[0],
+        categories: categoryStats,
+        dangerLevels: dangerStats
+      }
+    });
+  } catch (error) {
+    console.error('Get stats error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch statistics',
+      message: error.message
+    });
+  }
+});
+
 router.get('/nearby', [
   query('lat').isFloat({ min: -90, max: 90 }).toFloat(),
   query('lng').isFloat({ min: -180, max: 180 }).toFloat(),
@@ -256,7 +457,10 @@ router.get('/nearby', [
 router.get('/feed', [
   query('limit').optional().isInt({ min: 1, max: 50 }).toInt(),
   query('offset').optional().isInt({ min: 0 }).toInt(),
-  query('category').optional().isString().trim()
+  query('category').optional().isString().trim(),
+  query('lat').optional().isFloat({ min: -90, max: 90 }).toFloat(),
+  query('lng').optional().isFloat({ min: -180, max: 180 }).toFloat(),
+  query('priority_radius').optional().isInt({ min: 1, max: 1000 }).toInt()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -267,18 +471,11 @@ router.get('/feed', [
       });
     }
 
-    const { limit = 20, offset = 0, category } = req.query;
+    const { limit = 20, offset = 0, category, lat, lng, priority_radius = 100 } = req.query;
 
     let whereClause = 'WHERE l.is_approved = TRUE';
     let params = [];
-
-    if (category) {
-      whereClause += ' AND lc.name = ?';
-      params.push(category);
-    }
-
-    const query_sql = `
-      SELECT 
+    let selectFields = `
         l.id, l.title, l.description, l.latitude, l.longitude, l.address,
         lc.name as category_name, lc.icon as category_icon,
         dl.name as danger_level, dl.color as danger_color,
@@ -288,13 +485,44 @@ router.get('/feed', [
         l.likes_count as like_count,
         l.bookmarks_count as bookmark_count,
         l.comments_count as comment_count,
-        l.views_count as view_count
+        l.views_count as view_count`;
+    
+    let orderBy = 'ORDER BY l.created_at DESC';
+
+    if (category) {
+      whereClause += ' AND lc.name = ?';
+      params.push(category);
+    }
+
+    // Add geographic prioritization if coordinates provided
+    if (lat !== undefined && lng !== undefined) {
+      selectFields += `, 
+        (6371 * acos(cos(radians(?)) * cos(radians(l.latitude)) * 
+         cos(radians(l.longitude) - radians(?)) + 
+         sin(radians(?)) * sin(radians(l.latitude)))) AS distance`;
+      
+      // Priority ordering: nearby locations first, then by creation date
+      orderBy = `ORDER BY 
+        CASE WHEN (6371 * acos(cos(radians(?)) * cos(radians(l.latitude)) * 
+                  cos(radians(l.longitude) - radians(?)) + 
+                  sin(radians(?)) * sin(radians(l.latitude)))) <= ? THEN 0 ELSE 1 END,
+        (6371 * acos(cos(radians(?)) * cos(radians(l.latitude)) * 
+         cos(radians(l.longitude) - radians(?)) + 
+         sin(radians(?)) * sin(radians(l.latitude)))),
+        l.created_at DESC`;
+      
+      params.unshift(lat, lng, lat); // For SELECT distance calculation
+      params.push(lat, lng, lat, priority_radius, lat, lng, lat); // For ORDER BY
+    }
+
+    const query_sql = `
+      SELECT ${selectFields}
       FROM locations l
       LEFT JOIN location_categories lc ON l.category_id = lc.id
       LEFT JOIN danger_levels dl ON l.danger_level_id = dl.id
       LEFT JOIN users u ON l.submitted_by = u.id
       ${whereClause}
-      ORDER BY l.created_at DESC
+      ${orderBy}
       LIMIT ? OFFSET ?
     `;
 
@@ -703,6 +931,9 @@ router.post('/:id/like', authenticateToken, async (req, res) => {
       [likeCount[0].count, id]
     );
 
+    // Create notification
+    await createNotification(req.user.userId, 'Location Liked', `You have ${isLiked ? 'liked' : 'unliked'} a location.`, 'like', 'location', id);
+
     res.json({
       success: true,
       isLiked: isLiked,
@@ -788,6 +1019,9 @@ router.post('/:id/bookmark', authenticateToken, async (req, res) => {
       [bookmarkCount[0].count, id]
     );
 
+    // Create notification
+    await createNotification(req.user.userId, 'Location Bookmarked', `You have ${isBookmarked ? 'bookmarked' : 'unbookmarked'} a location.`, 'bookmark', 'location', id);
+
     res.json({
       success: true,
       isBookmarked: isBookmarked,
@@ -797,6 +1031,80 @@ router.post('/:id/bookmark', authenticateToken, async (req, res) => {
     console.error('Bookmark location error:', error);
     res.status(500).json({
       error: 'Failed to update bookmark status',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/locations/{id}/visit:
+ *   post:
+ *     summary: Track a location visit
+ *     tags: [Locations]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Visit tracked successfully
+ */
+router.post('/:id/visit', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if location exists
+    const [locations] = await pool.execute(
+      'SELECT id FROM locations WHERE id = ? AND is_approved = TRUE',
+      [id]
+    );
+
+    if (locations.length === 0) {
+      return res.status(404).json({
+        error: 'Location not found'
+      });
+    }
+
+    // Get user ID if authenticated, otherwise track anonymously
+    const userId = req.user?.id || null;
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get('User-Agent');
+
+    // Insert visit record
+    await pool.execute(
+      'INSERT INTO location_visits (location_id, user_id, ip_address, user_agent) VALUES (?, ?, ?, ?)',
+      [id, userId, ipAddress, userAgent]
+    );
+
+    // Update view count
+    await pool.execute(
+      'UPDATE locations SET views_count = views_count + 1 WHERE id = ?',
+      [id]
+    );
+
+    // Get updated view count
+    const [viewCount] = await pool.execute(
+      'SELECT views_count FROM locations WHERE id = ?',
+      [id]
+    );
+
+    // Create notification if user is authenticated
+    if (userId) {
+      await createNotification(userId, 'Location Visited', `You have visited a location.`, 'visit', 'location', id);
+    }
+
+    res.json({
+      success: true,
+      message: 'Visit tracked successfully',
+      viewCount: viewCount[0].views_count
+    });
+  } catch (error) {
+    console.error('Track visit error:', error);
+    res.status(500).json({
+      error: 'Failed to track visit',
       message: error.message
     });
   }
@@ -891,6 +1199,640 @@ router.get('/search', [
     console.error('Search locations error:', error);
     res.status(500).json({
       error: 'Search failed',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/locations/{id}/details:
+ *   get:
+ *     summary: Get detailed information about a specific location
+ *     tags: [Locations]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Detailed location information
+ */
+// Optional authentication middleware for location details
+const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token) {
+      // If token is provided, try to authenticate
+      const decoded = jwt.verify(token, 'your-super-secret-jwt-key-change-in-production');
+      
+      const [users] = await pool.execute(
+        'SELECT id, username, email, is_premium FROM users WHERE id = ? AND is_active = TRUE',
+        [decoded.userId]
+      );
+
+      if (users.length > 0) {
+        req.user = {
+          id: decoded.userId,
+          userId: decoded.userId,
+          username: decoded.username,
+          isPremium: users[0].is_premium
+        };
+      }
+    }
+    // If no token or invalid token, continue without user
+    next();
+  } catch (error) {
+    // If authentication fails, continue without user
+    console.log('[Optional Auth] Authentication failed, continuing without user:', error.message);
+    next();
+  }
+};
+
+router.get('/:id/details', optionalAuth, async (req, res) => {
+  try {
+    const locationId = req.params.id;
+    console.log(`[Location Details] Request for location ${locationId}`);
+    console.log(`[Location Details] Authorization header:`, req.headers.authorization ? 'Present' : 'Missing');
+    console.log(`[Location Details] req.user:`, req.user ? `ID: ${req.user.id}, Username: ${req.user.username}` : 'Not authenticated');
+    
+    // Get detailed location info with all relationships
+    const [locationResult] = await pool.execute(`
+      SELECT 
+        l.id,
+        l.title,
+        l.description,
+        l.latitude,
+        l.longitude,
+        l.address,
+        l.views_count,
+        l.likes_count,
+        l.bookmarks_count,
+        l.comments_count,
+        l.created_at as submission_date,
+        l.featured,
+        lc.name as category_name,
+        lc.icon as category_icon,
+        lc.color as category_color,
+        dl.name as danger_level,
+        dl.color as danger_color,
+        dl.description as danger_description,
+        dl.risk_level,
+        u.username as submitted_by_username,
+        u.profile_image_url as submitted_by_avatar
+      FROM locations l
+      LEFT JOIN location_categories lc ON l.category_id = lc.id
+      LEFT JOIN danger_levels dl ON l.danger_level_id = dl.id
+      LEFT JOIN users u ON l.submitted_by = u.id
+      WHERE l.id = ? AND l.is_approved = 1 AND l.deleted_at IS NULL
+    `, [locationId]);
+
+    if (locationResult.length === 0) {
+      return res.status(404).json({
+        error: 'Location not found'
+      });
+    }
+
+    const location = locationResult[0];
+
+    // Get location images
+    const [images] = await pool.execute(`
+      SELECT image_url, thumbnail_url, alt_text as caption
+      FROM location_images 
+      WHERE location_id = ? 
+      ORDER BY image_order ASC, created_at ASC
+    `, [locationId]);
+
+    // Get location tags
+    const [tags] = await pool.execute(`
+      SELECT t.name, t.id
+      FROM location_tags lt
+      JOIN tags t ON lt.tag_id = t.id
+      WHERE lt.location_id = ?
+    `, [locationId]);
+
+    // Get timeline events (location visits, updates, etc.)
+    const [timeline] = await pool.execute(`
+      SELECT 
+        'visit' as event_type,
+        lv.visited_at as timestamp,
+        CONCAT('Location visited by ', u.username) as description,
+        u.username,
+        u.profile_image_url as avatar
+      FROM location_visits lv
+      JOIN users u ON lv.user_id = u.id
+      WHERE lv.location_id = ?
+      
+      UNION ALL
+      
+      SELECT 
+        'submission' as event_type,
+        l.created_at as timestamp,
+        CONCAT('Location submitted by ', u.username) as description,
+        u.username,
+        u.profile_image_url as avatar
+      FROM locations l
+      JOIN users u ON l.submitted_by = u.id
+      WHERE l.id = ?
+      
+      ORDER BY timestamp DESC
+      LIMIT 10
+    `, [locationId, locationId]);
+
+    // Check if user liked/bookmarked (if authenticated)
+    let userInteractions = {
+      isLiked: false,
+      isBookmarked: false,
+      hasVisited: false
+    };
+
+    if (req.user) {
+      console.log(`[Location Details] Checking interactions for user ${req.user.id} and location ${locationId}`);
+      
+      const [interactions] = await pool.execute(`
+        SELECT 
+          EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND location_id = ?) as is_liked,
+          EXISTS(SELECT 1 FROM bookmarks WHERE user_id = ? AND location_id = ?) as is_bookmarked,
+          EXISTS(SELECT 1 FROM location_visits WHERE user_id = ? AND location_id = ?) as has_visited
+      `, [req.user.id, locationId, req.user.id, locationId, req.user.id, locationId]);
+      
+      console.log(`[Location Details] Raw interactions query result:`, interactions[0]);
+      
+      if (interactions.length > 0) {
+        userInteractions = {
+          isLiked: !!interactions[0].is_liked,
+          isBookmarked: !!interactions[0].is_bookmarked,
+          hasVisited: !!interactions[0].has_visited
+        };
+        console.log(`[Location Details] Final userInteractions:`, userInteractions);
+      }
+    } else {
+      console.log(`[Location Details] No authenticated user found`);
+    }
+
+    res.json({
+      success: true,
+      location: {
+        ...location,
+        images,
+        tags: tags.map(tag => tag.name),
+        timeline,
+        userInteractions
+      }
+    });
+
+  } catch (error) {
+    console.error('Get location details error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch location details',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/locations/{id}/comments:
+ *   get:
+ *     summary: Get comments for a specific location
+ *     tags: [Comments]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *     responses:
+ *       200:
+ *         description: List of comments for the location
+ */
+router.get('/:id/comments', optionalAuth, [
+  query('limit').optional().isInt({ min: 1, max: 50 }).toInt(),
+  query('offset').optional().isInt({ min: 0 }).toInt()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: errors.array()
+      });
+    }
+
+    const locationId = req.params.id;
+    const { limit = 20, offset = 0 } = req.query;
+    
+    console.log(`[Comments] Request for location ${locationId}, limit: ${limit}, offset: ${offset}`);
+    console.log(`[Comments] User authenticated:`, req.user ? `ID: ${req.user.id}` : 'No');
+
+    // Get comments with user info and reply counts
+    console.log(`[Comments] Executing SQL query with params: locationId=${locationId}, limit=${limit}, offset=${offset}`);
+    const [comments] = await pool.execute(`
+      SELECT 
+        c.id,
+        c.comment_text,
+        c.likes_count,
+        c.created_at,
+        c.updated_at,
+        c.parent_comment_id,
+        u.id as user_id,
+        u.username,
+        u.profile_image_url as avatar,
+        (SELECT COUNT(*) FROM comments WHERE parent_comment_id = c.id AND is_approved = 1) as reply_count
+      FROM comments c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.location_id = ? AND c.is_approved = 1 AND c.parent_comment_id IS NULL
+      ORDER BY c.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [locationId, limit, offset]);
+    
+    // Convert reply_count from string to integer
+    comments.forEach(comment => {
+      comment.reply_count = parseInt(comment.reply_count, 10);
+    });
+    
+    console.log(`[Comments] Found ${comments.length} comments:`, comments.map(c => ({ id: c.id, text: c.comment_text, user: c.username, replies: c.reply_count })));
+
+    // Get replies for each comment
+    for (let comment of comments) {
+      const [replies] = await pool.execute(`
+        SELECT 
+          c.id,
+          c.comment_text,
+          c.likes_count,
+          c.created_at,
+          c.updated_at,
+          u.id as user_id,
+          u.username,
+          u.profile_image_url as avatar
+        FROM comments c
+        JOIN users u ON c.user_id = u.id
+        WHERE c.parent_comment_id = ? AND c.is_approved = 1
+        ORDER BY c.created_at ASC
+        LIMIT 5
+      `, [comment.id]);
+      
+      comment.replies = replies;
+    }
+
+    // Get total comment count
+    const [countResult] = await pool.execute(
+      'SELECT COUNT(*) as total FROM comments WHERE location_id = ? AND is_approved = 1 AND parent_comment_id IS NULL',
+      [locationId]
+    );
+
+    const totalCount = parseInt(countResult[0].total, 10);
+    
+    console.log(`[Comments] Total count: ${totalCount}, returning ${comments.length} comments`);
+
+    const response = {
+      success: true,
+      comments,
+      pagination: {
+        total: totalCount,
+        limit,
+        offset,
+        hasMore: offset + limit < totalCount
+      }
+    };
+    
+    console.log(`[Comments] Response:`, JSON.stringify(response, null, 2));
+    res.json(response);
+
+  } catch (error) {
+    console.error('Get comments error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch comments',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/locations/{id}/comments:
+ *   post:
+ *     summary: Add a comment to a location
+ *     tags: [Comments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               comment_text:
+ *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 1000
+ *               parent_comment_id:
+ *                 type: integer
+ *                 nullable: true
+ *     responses:
+ *       201:
+ *         description: Comment created successfully
+ */
+router.post('/:id/comments', authenticateToken, [
+  body('comment_text').trim().isLength({ min: 1, max: 1000 }).withMessage('Comment must be between 1 and 1000 characters'),
+  body('parent_comment_id').optional().isInt().withMessage('Parent comment ID must be an integer')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: errors.array()
+      });
+    }
+
+    const locationId = req.params.id;
+    const { comment_text, parent_comment_id = null } = req.body;
+    const userId = req.user.id;
+
+    // Verify location exists and is approved
+    const [locationCheck] = await pool.execute(
+      'SELECT id FROM locations WHERE id = ? AND is_approved = 1 AND deleted_at IS NULL',
+      [locationId]
+    );
+
+    if (locationCheck.length === 0) {
+      return res.status(404).json({
+        error: 'Location not found'
+      });
+    }
+
+    // If replying to a comment, verify parent comment exists
+    if (parent_comment_id) {
+      const [parentCheck] = await pool.execute(
+        'SELECT id FROM comments WHERE id = ? AND location_id = ? AND is_approved = 1',
+        [parent_comment_id, locationId]
+      );
+
+      if (parentCheck.length === 0) {
+        return res.status(404).json({
+          error: 'Parent comment not found'
+        });
+      }
+    }
+
+    // Insert comment
+    const [result] = await pool.execute(`
+      INSERT INTO comments (location_id, user_id, comment_text, parent_comment_id)
+      VALUES (?, ?, ?, ?)
+    `, [locationId, userId, comment_text, parent_comment_id]);
+
+    // Update location comment count
+    await pool.execute(
+      'UPDATE locations SET comments_count = comments_count + 1 WHERE id = ?',
+      [locationId]
+    );
+
+    // Get the created comment with user info
+    const [commentResult] = await pool.execute(`
+      SELECT 
+        c.id,
+        c.comment_text,
+        c.likes_count,
+        c.created_at,
+        c.updated_at,
+        c.parent_comment_id,
+        u.id as user_id,
+        u.username,
+        u.profile_image_url as avatar
+      FROM comments c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.id = ?
+    `, [result.insertId]);
+
+    // Create notification for location owner (if not commenting on own location)
+    const [locationOwner] = await pool.execute(
+      'SELECT submitted_by FROM locations WHERE id = ?',
+      [locationId]
+    );
+
+    if (locationOwner[0]?.submitted_by && locationOwner[0].submitted_by !== userId) {
+      await createNotification(
+        locationOwner[0].submitted_by,
+        'New Comment',
+        `${req.user.username} commented on your location`,
+        'comment',
+        'location',
+        locationId
+      );
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Comment added successfully',
+      comment: commentResult[0]
+    });
+
+  } catch (error) {
+    console.error('Add comment error:', error);
+    res.status(500).json({
+      error: 'Failed to add comment',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/locations/{id}/toggle-like:
+ *   post:
+ *     summary: Toggle like status for a location
+ *     tags: [Locations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Like status toggled successfully
+ */
+router.post('/:id/toggle-like', authenticateToken, async (req, res) => {
+  try {
+    const locationId = req.params.id;
+    const userId = req.user.id;
+    
+    console.log('Toggle like request:', { locationId, userId, user: req.user });
+
+    // Check if location exists and is approved
+    const [locationCheck] = await pool.execute(
+      'SELECT id FROM locations WHERE id = ? AND is_approved = 1 AND deleted_at IS NULL',
+      [locationId]
+    );
+
+    if (locationCheck.length === 0) {
+      return res.status(404).json({
+        error: 'Location not found'
+      });
+    }
+
+    // Check if already liked
+    const [existingLike] = await pool.execute(
+      'SELECT id FROM likes WHERE user_id = ? AND location_id = ?',
+      [userId, locationId]
+    );
+
+    if (existingLike.length > 0) {
+      // Remove like
+      await pool.execute(
+        'DELETE FROM likes WHERE user_id = ? AND location_id = ?',
+        [userId, locationId]
+      );
+      
+      // Decrease like count
+      await pool.execute(
+        'UPDATE locations SET likes_count = GREATEST(0, likes_count - 1) WHERE id = ?',
+        [locationId]
+      );
+
+      res.json({
+        success: true,
+        message: 'Like removed',
+        isLiked: false
+      });
+    } else {
+      // Add like
+      await pool.execute(
+        'INSERT INTO likes (user_id, location_id) VALUES (?, ?)',
+        [userId, locationId]
+      );
+      
+      // Increase like count
+      await pool.execute(
+        'UPDATE locations SET likes_count = likes_count + 1 WHERE id = ?',
+        [locationId]
+      );
+
+      res.json({
+        success: true,
+        message: 'Location liked',
+        isLiked: true
+      });
+    }
+
+  } catch (error) {
+    console.error('Toggle like error:', error);
+    res.status(500).json({
+      error: 'Failed to toggle like',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/locations/{id}/toggle-bookmark:
+ *   post:
+ *     summary: Toggle bookmark status for a location
+ *     tags: [Locations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Bookmark status toggled successfully
+ */
+router.post('/:id/toggle-bookmark', authenticateToken, async (req, res) => {
+  try {
+    const locationId = req.params.id;
+    const userId = req.user.id;
+    
+    console.log('Toggle bookmark request:', { locationId, userId, user: req.user });
+
+    // Check if location exists and is approved
+    const [locationCheck] = await pool.execute(
+      'SELECT id FROM locations WHERE id = ? AND is_approved = 1 AND deleted_at IS NULL',
+      [locationId]
+    );
+
+    if (locationCheck.length === 0) {
+      return res.status(404).json({
+        error: 'Location not found'
+      });
+    }
+
+    // Check if already bookmarked
+    const [existingBookmark] = await pool.execute(
+      'SELECT id FROM bookmarks WHERE user_id = ? AND location_id = ?',
+      [userId, locationId]
+    );
+
+    if (existingBookmark.length > 0) {
+      // Remove bookmark
+      await pool.execute(
+        'DELETE FROM bookmarks WHERE user_id = ? AND location_id = ?',
+        [userId, locationId]
+      );
+      
+      // Decrease bookmark count
+      await pool.execute(
+        'UPDATE locations SET bookmarks_count = GREATEST(0, bookmarks_count - 1) WHERE id = ?',
+        [locationId]
+      );
+
+      res.json({
+        success: true,
+        message: 'Bookmark removed',
+        isBookmarked: false
+      });
+    } else {
+      // Add bookmark
+      await pool.execute(
+        'INSERT INTO bookmarks (user_id, location_id) VALUES (?, ?)',
+        [userId, locationId]
+      );
+      
+      // Increase bookmark count
+      await pool.execute(
+        'UPDATE locations SET bookmarks_count = bookmarks_count + 1 WHERE id = ?',
+        [locationId]
+      );
+
+      res.json({
+        success: true,
+        message: 'Location bookmarked',
+        isBookmarked: true
+      });
+    }
+
+  } catch (error) {
+    console.error('Toggle bookmark error:', error);
+    res.status(500).json({
+      error: 'Failed to toggle bookmark',
       message: error.message
     });
   }
