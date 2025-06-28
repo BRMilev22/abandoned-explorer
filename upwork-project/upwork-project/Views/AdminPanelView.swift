@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import MapboxMaps
+import CoreLocation
 
 struct AdminPanelView: View {
     @EnvironmentObject var dataManager: DataManager
@@ -85,7 +87,7 @@ struct PendingLocationsView: View {
             }
         }
         .sheet(item: $showingLocationDetail) { location in
-            LocationDetailView(location: location, isAdminReview: true)
+            AdminLocationDetailView(location: location)
         }
     }
 }
@@ -226,6 +228,301 @@ struct AdminStatisticsView: View {
     }
 }
 
+struct AdminLocationDetailView: View {
+    let location: AbandonedLocation
+    @EnvironmentObject var dataManager: DataManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var isProcessing = false
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header with basic info
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(location.title)
+                            .font(.title)
+                            .fontWeight(.bold)
+                        
+                        HStack {
+                            Label(location.category.rawValue, systemImage: "tag.fill")
+                                .foregroundColor(.orange)
+                            
+                            Spacer()
+                            
+                            Label(location.danger.rawValue, systemImage: "exclamationmark.triangle.fill")
+                                .foregroundColor(dangerLevelColor(location.danger))
+                        }
+                        .font(.subheadline)
+                    }
+                    .padding()
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(12)
+                    
+                    // Submission Info
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Submission Details")
+                            .font(.headline)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            InfoRow(label: "Submitted by", value: location.submittedByUsername ?? "User \(location.submittedBy ?? 0)")
+                            InfoRow(label: "Submission date", value: DateFormatter.adminStyle.string(from: location.submissionDate))
+                            InfoRow(label: "Location ID", value: "\(location.id)")
+                            InfoRow(label: "Address", value: location.address)
+                        }
+                    }
+                    .padding()
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(12)
+                    
+                    // Location Coordinates
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Geographic Information")
+                            .font(.headline)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            InfoRow(label: "Latitude", value: String(format: "%.6f", location.latitude))
+                            InfoRow(label: "Longitude", value: String(format: "%.6f", location.longitude))
+                            InfoRow(label: "Coordinates", value: "\(String(format: "%.6f", location.latitude)), \(String(format: "%.6f", location.longitude))")
+                        }
+                    }
+                    .padding()
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(12)
+                    
+                    // Map Visualization
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Location on Map")
+                            .font(.headline)
+                        
+                        AdminMapView(location: location)
+                            .frame(height: 250)
+                            .cornerRadius(12)
+                    }
+                    .padding()
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(12)
+                    
+                    // Description
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Description")
+                            .font(.headline)
+                        
+                        Text(location.description)
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(12)
+                    
+                    // Images
+                    if !location.displayImages.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Images (\(location.displayImages.count))")
+                                .font(.headline)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(0..<location.displayImages.count, id: \.self) { index in
+                                        CachedAsyncImage(url: location.displayImages[index]) { image in
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                        } placeholder: {
+                                            Rectangle()
+                                                .fill(Color.gray.opacity(0.3))
+                                                .overlay(
+                                                    ProgressView()
+                                                )
+                                        }
+                                        .frame(width: 150, height: 150)
+                                        .clipped()
+                                        .cornerRadius(8)
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                        .padding()
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .cornerRadius(12)
+                    }
+                    
+                    // Tags
+                    if !location.tags.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Tags")
+                                .font(.headline)
+                            
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
+                                ForEach(location.tags, id: \.self) { tag in
+                                    Text("#\(tag)")
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.orange.opacity(0.2))
+                                        .foregroundColor(.orange)
+                                        .cornerRadius(4)
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .cornerRadius(12)
+                    }
+                    
+                    // Admin Actions
+                    HStack(spacing: 16) {
+                        Button("Reject") {
+                            isProcessing = true
+                            dataManager.rejectLocation(location.id)
+                            dismiss()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                        .disabled(isProcessing)
+                        
+                        Button("Approve") {
+                            isProcessing = true
+                            dataManager.approveLocation(location.id)
+                            dismiss()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                        .disabled(isProcessing)
+                    }
+                    .padding(.bottom, 20)
+                }
+                .padding()
+            }
+            .navigationTitle("Location Review")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func dangerLevelColor(_ danger: DangerLevel) -> Color {
+        switch danger {
+        case .safe: return .green
+        case .caution: return .yellow
+        case .dangerous: return .red
+        }
+    }
+}
+
+struct InfoRow: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+        }
+    }
+}
+
+struct AdminMapView: UIViewRepresentable {
+    let location: AbandonedLocation
+    
+    func makeUIView(context: Context) -> MapboxMaps.MapView {
+        let mapView = MapboxMaps.MapView(frame: .zero)
+        mapView.backgroundColor = UIColor.black
+        
+        // Load dark style
+        mapView.mapboxMap.loadStyle(.dark)
+        
+        // Set camera to location
+        let cameraOptions = CameraOptions(
+            center: location.coordinate,
+            zoom: 14.0
+        )
+        mapView.mapboxMap.setCamera(to: cameraOptions)
+        
+        context.coordinator.mapView = mapView
+        context.coordinator.setupAnnotation()
+        
+        return mapView
+    }
+    
+    func updateUIView(_ uiView: MapboxMaps.MapView, context: Context) {
+        // No updates needed for static display
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject {
+        var parent: AdminMapView
+        var mapView: MapboxMaps.MapView?
+        
+        init(_ parent: AdminMapView) {
+            self.parent = parent
+        }
+        
+        func setupAnnotation() {
+            guard let mapView = mapView else { return }
+            
+            let annotationManager = mapView.annotations.makePointAnnotationManager()
+            
+            // Create marker image
+            let markerImage = createLocationMarker()
+            try? mapView.mapboxMap.addImage(markerImage, id: "location-marker")
+            
+            // Add annotation
+            var annotation = PointAnnotation(coordinate: parent.location.coordinate)
+            annotation.iconImage = "location-marker"
+            annotation.iconSize = 1.0
+            annotation.iconAnchor = .center
+            
+            annotationManager.annotations = [annotation]
+        }
+        
+        private func createLocationMarker() -> UIImage {
+            let size = CGSize(width: 40, height: 40)
+            let renderer = UIGraphicsImageRenderer(size: size)
+            
+            return renderer.image { context in
+                let cgContext = context.cgContext
+                let rect = CGRect(origin: .zero, size: size)
+                
+                // Orange circle for location
+                cgContext.setFillColor(UIColor.systemOrange.cgColor)
+                cgContext.fillEllipse(in: rect)
+                
+                // White border
+                cgContext.setStrokeColor(UIColor.white.cgColor)
+                cgContext.setLineWidth(3)
+                cgContext.strokeEllipse(in: rect)
+                
+                // Inner white dot
+                let innerRect = CGRect(x: 16, y: 16, width: 8, height: 8)
+                cgContext.setFillColor(UIColor.white.cgColor)
+                cgContext.fillEllipse(in: innerRect)
+            }
+        }
+    }
+}
+
 struct AdminStatCard: View {
     let title: String
     let value: String
@@ -264,6 +561,15 @@ struct AdminStatCard: View {
                 )
         )
     }
+}
+
+extension DateFormatter {
+    static let adminStyle: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
 }
 
 #Preview {

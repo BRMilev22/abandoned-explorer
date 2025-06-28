@@ -874,6 +874,8 @@ class DataManager: ObservableObject {
                     self?.pendingLocations.removeAll { $0.id == locationId }
                     // Refresh all locations to show the approved location
                     self?.loadAllLocations()
+                    // Send notification for real-time updates
+                    NotificationCenter.default.post(name: NSNotification.Name("LocationApproved"), object: locationId)
                 }
             )
             .store(in: &cancellables)

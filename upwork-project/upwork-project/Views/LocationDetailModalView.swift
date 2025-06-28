@@ -107,13 +107,8 @@ struct LocationDetailModalView: View {
                                 // Modern stats with animations
                                 modernStatsSection(details: details)
                                 
-                                // Description and content
-                                modernContentSection(details: details)
-                                
-                                // Actual timeline from API
-                                if !details.timeline.isEmpty {
-                                    modernTimelineSection(details: details)
-                                }
+                                // Description section
+                                modernDescriptionSection(details: details)
                                 
                                 // Actual nearby locations
                                 modernNearbySection
@@ -261,7 +256,7 @@ struct LocationDetailModalView: View {
                 }
             }
         }
-        .frame(height: UIScreen.main.bounds.height * 0.6) // 60% of screen height
+        .frame(height: UIScreen.main.bounds.height * 0.4) // 40% of screen height
         .clipped()
     }
     
@@ -454,7 +449,81 @@ struct LocationDetailModalView: View {
     
 
     
-    // MARK: - Modern Content Section
+    // MARK: - Modern Description Section
+    private func modernDescriptionSection(details: LocationDetails) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // Description
+            if let description = details.description, !description.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Description")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                    
+                    Text(description)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundColor(.white.opacity(0.9))
+                        .lineLimit(nil)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
+                        .background(Material.ultraThinMaterial.opacity(0.4))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .padding(.horizontal, 16)
+                }
+            }
+            
+            // Tags with modern design
+            if !details.tags.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Tags")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(details.tags, id: \.self) { tag in
+                                Text("#\(tag)")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(Material.ultraThinMaterial)
+                                    .foregroundColor(.white)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                }
+            }
+            
+            // Additional info cards
+            VStack(spacing: 12) {
+                if let dangerLevel = details.dangerLevel {
+                    InfoCard(
+                        icon: "shield.fill",
+                        title: "Safety Level",
+                        subtitle: dangerLevel,
+                        color: dangerLevelColor(details.dangerColor)
+                    )
+                    .padding(.horizontal, 16)
+                }
+                
+                if let submittedBy = details.submittedByUsername {
+                    InfoCard(
+                        icon: "person.fill",
+                        title: "Submitted by",
+                        subtitle: submittedBy,
+                        color: .orange
+                    )
+                    .padding(.horizontal, 16)
+                }
+            }
+        }
+        .padding(.top, 20)
+    }
+    
+    // MARK: - Legacy Content Section (keeping for reference)
     private func modernContentSection(details: LocationDetails) -> some View {
         VStack(alignment: .leading, spacing: 20) {
             // Tags with modern design

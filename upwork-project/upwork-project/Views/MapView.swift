@@ -18,9 +18,10 @@ struct MapView: View {
     @State private var showLocationDetail = false
     @State private var lastLocationUpdate = Date()
     @State private var showingLocationSelector = false
-    @State private var selectedLocationCategory = "Abandoned"
+    @State private var selectedLocationCategory = "Social Map"
     @State private var showingProfile = false
     @State private var showingKeyAlerts = false
+
     @State private var currentZoomLevel: Double = 14.0
     @State private var currentMapCenter: CLLocationCoordinate2D?
     private let locationUpdateThreshold: TimeInterval = 5.0 // Increased from 3.0
@@ -56,39 +57,124 @@ struct MapView: View {
         return dataManager.activeUsersCount
     }
     
+    // Helper function to get verified abandoned locations
+    private func getVerifiedAbandonedLocations() -> [AbandonedLocation] {
+        // Filter for locations that are verified as abandoned
+        // For now, we'll use all approved locations until we have a proper verification system
+        return dataManager.getApprovedLocations()
+        // TODO: Add proper filtering logic when verification system is implemented
+        // return dataManager.getApprovedLocations().filter { $0.isVerifiedAbandoned == true }
+    }
+    
+    // Computed property for content view to simplify body
+    @ViewBuilder
+    private var contentView: some View {
+        switch selectedLocationCategory {
+        case "Social Map":
+            socialMapView
+        case "Verified Map":
+            verifiedMapView
+        case "Social Feed":
+            socialFeedView
+        default:
+            defaultMapView
+        }
+    }
+    
+    // Individual view components
+    @ViewBuilder
+    private var socialMapView: some View {
+        MapboxMapView(
+            accessToken: accessToken,
+            styleURI: customStyleURL,
+            locations: dataManager.getApprovedLocations(),
+            activeUsers: [],
+            userLocation: locationManager.userLocation,
+            onLocationTap: { location in
+                print("🎯 MapView: Location tapped - \(location.title) (ID: \(location.id))")
+                selectedLocation = location
+                showLocationDetail = true
+                print("🎯 MapView: showLocationDetail set to true, selectedLocation: \(selectedLocation?.title ?? "nil")")
+            },
+            onZoomChange: { zoomLevel in
+                currentZoomLevel = zoomLevel
+                handleZoomBasedLocationLoading(zoomLevel: zoomLevel)
+            },
+            onMapCenterChange: { center in
+                currentMapCenter = center
+                geocodingService.reverseGeocode(coordinate: center, zoomLevel: currentZoomLevel)
+                loadActiveUsers()
+                checkAndLoadLocationsForNewArea(center: center)
+            }
+        )
+    }
+    
+    @ViewBuilder
+    private var verifiedMapView: some View {
+        MapboxMapView(
+            accessToken: accessToken,
+            styleURI: customStyleURL,
+            locations: getVerifiedAbandonedLocations(),
+            activeUsers: [],
+            userLocation: locationManager.userLocation,
+            onLocationTap: { location in
+                print("🏚️ Verified location tapped - \(location.title) (ID: \(location.id))")
+                selectedLocation = location
+                showLocationDetail = true
+            },
+            onZoomChange: { zoomLevel in
+                currentZoomLevel = zoomLevel
+                handleZoomBasedLocationLoading(zoomLevel: zoomLevel)
+            },
+            onMapCenterChange: { center in
+                currentMapCenter = center
+                geocodingService.reverseGeocode(coordinate: center, zoomLevel: currentZoomLevel)
+                loadActiveUsers()
+                checkAndLoadLocationsForNewArea(center: center)
+            }
+        )
+    }
+    
+    @ViewBuilder
+    private var socialFeedView: some View {
+        FeedView()
+            .environmentObject(dataManager)
+            .environmentObject(locationManager)
+    }
+    
+    @ViewBuilder
+    private var defaultMapView: some View {
+        MapboxMapView(
+            accessToken: accessToken,
+            styleURI: customStyleURL,
+            locations: dataManager.getApprovedLocations(),
+            activeUsers: [],
+            userLocation: locationManager.userLocation,
+            onLocationTap: { location in
+                selectedLocation = location
+                showLocationDetail = true
+            },
+            onZoomChange: { zoomLevel in
+                currentZoomLevel = zoomLevel
+                handleZoomBasedLocationLoading(zoomLevel: zoomLevel)
+            },
+            onMapCenterChange: { center in
+                currentMapCenter = center
+                geocodingService.reverseGeocode(coordinate: center, zoomLevel: currentZoomLevel)
+                loadActiveUsers()
+                checkAndLoadLocationsForNewArea(center: center)
+            }
+        )
+    }
+    
     var body: some View {
         ZStack {
             // Background
             Color.black.ignoresSafeArea()
             
-            // Mapbox Map
-            MapboxMapView(
-                accessToken: accessToken,
-                styleURI: customStyleURL,
-                locations: dataManager.getApprovedLocations(),
-                activeUsers: [], // Hide active users from map display while keeping tracking
-                userLocation: locationManager.userLocation,
-                onLocationTap: { location in
-                    print("🎯 MapView: Location tapped - \(location.title) (ID: \(location.id))")
-                    selectedLocation = location
-                    showLocationDetail = true
-                    print("🎯 MapView: showLocationDetail set to true, selectedLocation: \(selectedLocation?.title ?? "nil")")
-                },
-                onZoomChange: { zoomLevel in
-                    currentZoomLevel = zoomLevel
-                    handleZoomBasedLocationLoading(zoomLevel: zoomLevel)
-                },
-                onMapCenterChange: { center in
-                    currentMapCenter = center
-                    // Update location name when map center changes
-                    geocodingService.reverseGeocode(coordinate: center, zoomLevel: currentZoomLevel)
-                    // Use smart active users loading with geographic context
-                    loadActiveUsers()
-                    // Check if we need to load locations for new area
-                    checkAndLoadLocationsForNewArea(center: center)
-                }
-            )
-            .ignoresSafeArea()
+            // Content based on selected view type
+            contentView
+                .ignoresSafeArea()
             
             // Header Overlay
             VStack {
@@ -183,30 +269,9 @@ struct MapView: View {
             }
         }
         .sheet(isPresented: $showingLocationSelector) {
-            if selectedLocationCategory == "List View" {
-                NavigationView {
-                    LocationsListView(
-                        locations: dataManager.getApprovedLocations(),
-                        onLocationTap: { location in
-                            print("📋 LocationsListView: Location tapped - \(location.title) (ID: \(location.id))")
-                            selectedLocation = location
-                            print("📋 LocationsListView: selectedLocation set to \(selectedLocation?.title ?? "nil")")
-                            showLocationDetail = true
-                            print("📋 LocationsListView: showLocationDetail set to \(showLocationDetail)")
-                            showingLocationSelector = false
-                        }
-                    )
-                    .navigationTitle("Abandoned Locations")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .navigationBarBackButtonHidden(false)
-                }
-                .presentationDetents([.large])
+            LocationCategorySelector(selectedCategory: $selectedLocationCategory)
+                .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
-            } else {
-                LocationCategorySelector(selectedCategory: $selectedLocationCategory)
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
-            }
         }
         .sheet(isPresented: $showingProfile) {
             ProfileView()
@@ -1901,15 +1966,9 @@ struct LocationCategorySelector: View {
     @Environment(\.dismiss) private var dismiss
     
     private let feedOptions = [
-        ("Abandoned", "🏚️", "Explore abandoned buildings and locations"),
-        ("List View", "📋", "View all locations in list format"),
-        ("Live Feed", "📡", "Real-time incidents and reports"),
-        ("Family Alerts", "👥", "Track family members and safety zones"),
-        ("Emergency", "🚨", "Emergency incidents and alerts"),
-        ("Community", "🏘️", "Local community reports and updates"),
-        ("Safety Zones", "🛡️", "Designated safe areas and shelters"),
-        ("Historical", "📚", "Historical incidents and locations"),
-        ("Weather Alerts", "🌪️", "Weather-related safety information")
+        ("Social Map", "🗺️", "Social map of all submissions and explorations"),
+        ("Verified Map", "🏚️", "Map of places verified as abandoned"),
+        ("Social Feed", "📋", "Social feed list view of all places")
     ]
     
     var body: some View {
@@ -1918,9 +1977,7 @@ struct LocationCategorySelector: View {
                 ForEach(feedOptions, id: \.0) { option in
                     Button(action: {
                         selectedCategory = option.0
-                        if option.0 != "List View" {
-                            dismiss()
-                        }
+                        dismiss()
                     }) {
                         HStack(spacing: 16) {
                             // Icon circle
