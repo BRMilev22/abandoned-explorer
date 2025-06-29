@@ -48,6 +48,25 @@ const upload = multer({
   }
 });
 
+// Configure Multer for video uploads
+const uploadVideo = multer({
+  storage: storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB for videos
+    files: 3
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedVideoTypes = ['mp4', 'mov', 'avi', 'webm'];
+    const fileType = file.mimetype.split('/')[1];
+    
+    if (allowedVideoTypes.includes(fileType) || file.mimetype.startsWith('video/')) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Video type ${fileType} not allowed. Allowed types: ${allowedVideoTypes.join(', ')}`));
+    }
+  }
+});
+
 /**
  * @swagger
  * /api/upload/images:
@@ -189,6 +208,159 @@ router.post('/images', [
     console.error('Image upload error:', error);
     res.status(500).json({
       error: 'Failed to upload images',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/upload/videos:
+ *   post:
+ *     summary: Upload videos for a location
+ *     tags: [Upload]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               videos:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *               location_id:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Videos uploaded successfully
+ *       400:
+ *         description: Invalid request
+ */
+router.post('/videos', [
+  authenticateToken,
+  uploadVideo.array('videos', 3),
+  body('location_id').isNumeric()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: errors.array()
+      });
+    }
+
+    const { location_id } = req.body;
+    const files = req.files;
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({
+        error: 'No videos provided'
+      });
+    }
+
+    // Check if location exists and belongs to user
+    const [locations] = await pool.execute(
+      'SELECT id FROM locations WHERE id = ? AND submitted_by = ?',
+      [location_id, req.user.userId]
+    );
+
+    if (locations.length === 0) {
+      return res.status(404).json({
+        error: 'Location not found or access denied'
+      });
+    }
+
+    // Create location-specific directory
+    const locationDir = path.join(locationsDir, location_id.toString());
+    await ensureDirectoryExists(locationDir);
+
+    const uploadPromises = files.map(async (file, index) => {
+      try {
+        // Generate unique filenames
+        const timestamp = Date.now();
+        const fileExtension = file.originalname.split('.').pop() || 'mp4';
+        const videoFilename = `video_${timestamp}_${index}.${fileExtension}`;
+        const thumbnailFilename = `video_thumb_${timestamp}_${index}.jpg`;
+        
+        const videoPath = path.join(locationDir, videoFilename);
+        const thumbnailPath = path.join(locationDir, thumbnailFilename);
+
+        // Save video file to disk
+        await fs.writeFile(videoPath, file.buffer);
+
+        // Create a simple placeholder thumbnail 
+        const thumbnailBuffer = await sharp({
+          create: {
+            width: 400,
+            height: 300,
+            channels: 3,
+            background: { r: 100, g: 100, b: 100 }
+          }
+        })
+        .png()
+        .composite([{
+          input: Buffer.from(
+            `<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+              <rect width="400" height="300" fill="#333"/>
+              <circle cx="200" cy="150" r="40" fill="#666"/>
+              <polygon points="180,130 180,170 220,150" fill="#fff"/>
+              <text x="200" y="200" text-anchor="middle" font-family="Arial" font-size="14" fill="#fff">Video</text>
+            </svg>`
+          ),
+          top: 0,
+          left: 0
+        }])
+        .jpeg({ quality: 75 })
+        .toBuffer();
+
+        await fs.writeFile(thumbnailPath, thumbnailBuffer);
+
+        // Generate URLs for accessing the videos
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        const videoUrl = `${baseUrl}/uploads/locations/${location_id}/${videoFilename}`;
+        const thumbnailUrl = `${baseUrl}/uploads/locations/${location_id}/${thumbnailFilename}`;
+
+        // Save to database
+        await pool.execute(`
+          INSERT INTO location_videos (location_id, video_url, thumbnail_url, video_order, uploaded_by, file_size)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [
+          location_id,
+          videoUrl,
+          thumbnailUrl,
+          index,
+          req.user.userId,
+          file.size
+        ]);
+
+        return {
+          url: videoUrl,
+          thumbnail: thumbnailUrl,
+          order: index
+        };
+      } catch (error) {
+        console.error(`Error processing video ${index}:`, error);
+        throw error;
+      }
+    });
+
+    const uploadedVideos = await Promise.all(uploadPromises);
+
+    res.json({
+      message: 'Videos uploaded successfully',
+      videos: uploadedVideos,
+      total_uploaded: uploadedVideos.length
+    });
+  } catch (error) {
+    console.error('Video upload error:', error);
+    res.status(500).json({
+      error: 'Failed to upload videos',
       message: error.message
     });
   }
@@ -341,6 +513,86 @@ router.delete('/images/:id', authenticateToken, async (req, res) => {
     console.error('Delete image error:', error);
     res.status(500).json({
       error: 'Failed to delete image',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/upload/videos/{id}:
+ *   delete:
+ *     summary: Delete a video
+ *     tags: [Upload]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Video deleted successfully
+ *       404:
+ *         description: Video not found
+ */
+router.delete('/videos/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get video details
+    const [videos] = await pool.execute(`
+      SELECT lv.*, l.submitted_by 
+      FROM location_videos lv
+      JOIN locations l ON lv.location_id = l.id
+      WHERE lv.id = ?
+    `, [id]);
+
+    if (videos.length === 0) {
+      return res.status(404).json({
+        error: 'Video not found'
+      });
+    }
+
+    const video = videos[0];
+
+    // Check if user owns the location
+    if (video.submitted_by !== req.user.userId) {
+      return res.status(403).json({
+        error: 'Access denied'
+      });
+    }
+
+    // Extract file paths from URLs
+    const videoUrl = new URL(video.video_url);
+    const thumbnailUrl = new URL(video.thumbnail_url);
+    
+    const videoPath = path.join(__dirname, '..', videoUrl.pathname);
+    const thumbnailPath = path.join(__dirname, '..', thumbnailUrl.pathname);
+
+    // Delete files from disk
+    try {
+      await Promise.all([
+        fs.unlink(videoPath),
+        fs.unlink(thumbnailPath)
+      ]);
+    } catch (fileError) {
+      console.warn('Error deleting video files:', fileError);
+      // Continue even if file deletion fails
+    }
+
+    // Delete from database
+    await pool.execute('DELETE FROM location_videos WHERE id = ?', [id]);
+
+    res.json({
+      message: 'Video deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete video error:', error);
+    res.status(500).json({
+      error: 'Failed to delete video',
       message: error.message
     });
   }

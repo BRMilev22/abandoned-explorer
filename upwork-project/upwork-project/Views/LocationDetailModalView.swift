@@ -1,6 +1,114 @@
 import SwiftUI
 import CoreLocation
 import Combine
+import AVKit
+import AVFoundation
+
+// MARK: - Combined Media Types
+enum MediaItem: Hashable {
+    case image(LocationImage)
+    case video(LocationVideo)
+    
+    var url: String {
+        switch self {
+        case .image(let img): return img.imageUrl
+        case .video(let vid): return vid.videoUrl
+        }
+    }
+    
+    var thumbnailUrl: String? {
+        switch self {
+        case .image(let img): return img.thumbnailUrl
+        case .video(let vid): return vid.thumbnailUrl
+        }
+    }
+    
+    var isVideo: Bool {
+        switch self {
+        case .image: return false
+        case .video: return true
+        }
+    }
+}
+
+// MARK: - Video Player View with Play Button
+struct VideoPlayerView: View {
+    let url: URL
+    @State private var isPlaying = false
+    @State private var showPlayer = false
+    
+    var body: some View {
+        ZStack {
+            // Video thumbnail/preview
+            Rectangle()
+                .fill(Color.black)
+                .overlay(
+                    Group {
+                        if showPlayer {
+                            VideoController(url: url, isPlaying: $isPlaying)
+                        } else {
+                            // Play button overlay
+                            VStack(spacing: 12) {
+                                Button(action: {
+                                    showPlayer = true
+                                    isPlaying = true
+                                }) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.black.opacity(0.7))
+                                            .frame(width: 80, height: 80)
+                                        
+                                        Circle()
+                                            .stroke(Color.white, lineWidth: 3)
+                                            .frame(width: 80, height: 80)
+                                        
+                                        Image(systemName: "play.fill")
+                                            .font(.system(size: 32, weight: .medium))
+                                            .foregroundColor(.white)
+                                            .offset(x: 3) // Slight offset to center visually
+                                    }
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                
+                                Text("Tap to play video")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                        }
+                    }
+                )
+        }
+    }
+}
+
+// MARK: - Internal Video Controller
+struct VideoController: UIViewControllerRepresentable {
+    let url: URL
+    @Binding var isPlaying: Bool
+    
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        let player = AVPlayer(url: url)
+        controller.player = player
+        controller.showsPlaybackControls = true
+        controller.videoGravity = .resizeAspectFill
+        
+        // Don't auto-play - wait for user interaction
+        if isPlaying {
+            player.play()
+        }
+        
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
+        if isPlaying {
+            uiViewController.player?.play()
+        } else {
+            uiViewController.player?.pause()
+        }
+    }
+}
 
 struct LocationDetailModalView: View {
     @EnvironmentObject var dataManager: DataManager
@@ -158,29 +266,18 @@ struct LocationDetailModalView: View {
     private func heroMediaSection(details: LocationDetails) -> some View {
         GeometryReader { geometry in
             ZStack {
-                if !details.images.isEmpty {
+                // Combine images and videos into a single media array
+                let mediaItems: [MediaItem] = details.images.map { .image($0) } + details.videos.map { .video($0) }
+                
+                if !mediaItems.isEmpty {
                     TabView(selection: $selectedImageIndex) {
-                        ForEach(0..<details.images.count, id: \.self) { index in
-                            let image = details.images[index]
-                            CachedAsyncImage(url: image.imageUrl) { image in
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: geometry.size.width, height: geometry.size.height)
-                                    .clipped()
-                                    .onTapGesture {
-                                        showingFullscreenImage = true
-                                    }
-                            } placeholder: {
-                                Rectangle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: geometry.size.width, height: geometry.size.height)
-                                    .overlay(
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    )
-                            }
-                            .tag(index)
+                        ForEach(0..<mediaItems.count, id: \.self) { index in
+                            MediaItemView(mediaItem: mediaItems[index])
+                                .frame(width: geometry.size.width, height: geometry.size.height)
+                                .onTapGesture {
+                                    showingFullscreenImage = true
+                                }
+                                .tag(index)
                         }
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
@@ -193,7 +290,7 @@ struct LocationDetailModalView: View {
                                 Image(systemName: "photo")
                                     .foregroundColor(.gray)
                                     .font(.system(size: 40))
-                                Text("No images available")
+                                Text("No media available")
                                     .foregroundColor(.gray)
                                     .font(.caption)
                             }
@@ -201,14 +298,22 @@ struct LocationDetailModalView: View {
                 }
                 
                 // Page indicators (bottom center)
-                if details.images.count > 1 {
+                if mediaItems.count > 1 {
                     VStack {
                         Spacer()
                         HStack(spacing: 8) {
-                            ForEach(0..<details.images.count, id: \.self) { index in
+                            ForEach(Array(mediaItems.enumerated()), id: \.offset) { index, mediaItem in
                                 Circle()
                                     .fill(selectedImageIndex == index ? Color.white : Color.white.opacity(0.5))
                                     .frame(width: 8, height: 8)
+                                    .overlay(
+                                        // Add a small video icon for video items
+                                        mediaItem.isVideo ? 
+                                        Image(systemName: "play.fill")
+                                            .font(.system(size: 4))
+                                            .foregroundColor(.black)
+                                        : nil
+                                    )
                             }
                         }
                         .padding(.bottom, 20)
@@ -958,6 +1063,7 @@ struct LocationDetailModalView: View {
                             submittedByUsername: details.submittedByUsername,
                             submittedByAvatar: details.submittedByAvatar,
                             images: details.images,
+                            videos: details.videos,
                             tags: details.tags,
                             timeline: details.timeline,
                             userInteractions: details.userInteractions
@@ -1014,6 +1120,7 @@ struct LocationDetailModalView: View {
                             submittedByUsername: details.submittedByUsername,
                             submittedByAvatar: details.submittedByAvatar,
                             images: details.images,
+                            videos: details.videos,
                             tags: details.tags,
                             timeline: details.timeline,
                             userInteractions: UserInteractions(
@@ -1074,6 +1181,7 @@ struct LocationDetailModalView: View {
                         submittedByUsername: details.submittedByUsername,
                         submittedByAvatar: details.submittedByAvatar,
                         images: details.images,
+                        videos: details.videos,
                         tags: details.tags,
                         timeline: details.timeline,
                         userInteractions: newUserInteractions
@@ -1129,6 +1237,7 @@ struct LocationDetailModalView: View {
                         submittedByUsername: details.submittedByUsername,
                         submittedByAvatar: details.submittedByAvatar,
                         images: details.images,
+                        videos: details.videos,
                         tags: details.tags,
                         timeline: details.timeline,
                         userInteractions: newUserInteractions
@@ -1855,6 +1964,48 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+struct MediaItemView: View {
+    let mediaItem: MediaItem
+    
+    var body: some View {
+        if mediaItem.isVideo {
+            // Video player view
+            if let videoURL = URL(string: mediaItem.url) {
+                VideoPlayerView(url: videoURL)
+                    .clipped()
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay(
+                        VStack {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.orange)
+                                .font(.system(size: 30))
+                            Text("Invalid video URL")
+                                .foregroundColor(.orange)
+                                .font(.caption)
+                        }
+                    )
+            }
+        } else {
+            // Image view
+            CachedAsyncImage(url: mediaItem.url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .clipped()
+            } placeholder: {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay(
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    )
+            }
+        }
+    }
 }
 
 #Preview {

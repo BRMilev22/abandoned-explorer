@@ -8,6 +8,115 @@
 import SwiftUI
 import MapboxMaps
 import CoreLocation
+import AVKit
+
+// MARK: - Helper Extensions
+extension String {
+    var isVideoURL: Bool {
+        let videoExtensions = ["mp4", "mov", "avi", "mkv", "m4v", "webm"]
+        let pathExtension = URL(string: self)?.pathExtension.lowercased() ?? ""
+        let hasVideoExtension = videoExtensions.contains(pathExtension)
+        let containsVideoKeyword = self.lowercased().contains("video_")
+        
+        return hasVideoExtension || containsVideoKeyword
+    }
+    
+    var isImageURL: Bool {
+        let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff"]
+        let pathExtension = URL(string: self)?.pathExtension.lowercased() ?? ""
+        let hasImageExtension = imageExtensions.contains(pathExtension)
+        let containsImageKeyword = self.lowercased().contains("original_") || self.lowercased().contains("thumb_")
+        
+        return hasImageExtension || containsImageKeyword
+    }
+}
+
+// MARK: - Safe Media Display Helper
+struct SafeMediaThumbnail: View {
+    let url: String
+    let size: CGFloat
+    @State private var showingVideoPlayer = false
+    
+    var body: some View {
+        if url.isEmpty {
+            // Empty URL
+            Rectangle()
+                .fill(Color.gray.opacity(0.2))
+                .overlay(
+                    Image(systemName: "photo")
+                        .foregroundColor(.gray)
+                )
+                .frame(width: size, height: size)
+        } else if url.isVideoURL {
+            // Video thumbnail placeholder - make it tappable
+            Button(action: {
+                showingVideoPlayer = true
+            }) {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.3)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        VStack(spacing: 4) {
+                            Image(systemName: "play.circle.fill")
+                                .font(.system(size: size * 0.25))
+                                .foregroundColor(.white)
+                            Text("VIDEO")
+                                .font(.system(size: max(8, size * 0.08), weight: .semibold))
+                                .foregroundColor(.white)
+                            Text("Tap to play")
+                                .font(.system(size: max(6, size * 0.06)))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                    )
+                    .frame(width: size, height: size)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .sheet(isPresented: $showingVideoPlayer) {
+                AdminVideoPlayerView(videoURL: url)
+            }
+        } else if url.isImageURL {
+            // Safe image loading
+            CachedAsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay(
+                        ProgressView()
+                            .tint(.white)
+                    )
+            }
+            .frame(width: size, height: size)
+        } else {
+            // Unknown format - show URL info for debugging
+            Rectangle()
+                .fill(Color.orange.opacity(0.3))
+                .overlay(
+                    VStack(spacing: 4) {
+                        Image(systemName: "questionmark.circle")
+                            .font(.system(size: size * 0.2))
+                            .foregroundColor(.orange)
+                        Text("UNKNOWN")
+                            .font(.system(size: max(8, size * 0.06), weight: .semibold))
+                            .foregroundColor(.orange)
+                        if size > 100 {
+                            Text(URL(string: url)?.pathExtension.uppercased() ?? "?")
+                                .font(.system(size: max(6, size * 0.05)))
+                                .foregroundColor(.orange.opacity(0.8))
+                        }
+                    }
+                )
+                .frame(width: size, height: size)
+        }
+    }
+}
 
 struct AdminPanelView: View {
     @EnvironmentObject var dataManager: DataManager
@@ -101,20 +210,22 @@ struct PendingLocationRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                CachedAsyncImage(url: location.displayImages.first ?? "") { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(.gray)
-                        )
-                }
-                .frame(width: 80, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                // Safe media display - get first available media (image or video)
+                let firstMediaURL = {
+                    // First try to get an image
+                    if let firstImage = location.displayImages.first(where: { $0.isImageURL }) {
+                        return firstImage
+                    }
+                    // If no images, try to get a video
+                    if let firstVideo = location.displayVideos.first {
+                        return firstVideo
+                    }
+                    // Fallback to first item in displayImages (legacy compatibility)
+                    return location.displayImages.first ?? ""
+                }()
+                
+                SafeMediaThumbnail(url: firstMediaURL, size: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(location.title)
@@ -228,6 +339,72 @@ struct AdminStatisticsView: View {
     }
 }
 
+// MARK: - Admin Video Player View
+struct AdminVideoPlayerView: View {
+    let videoURL: String
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                if let url = URL(string: videoURL) {
+                    AdminVideoController(url: url)
+                        .navigationTitle("Review Video")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Close") {
+                                    dismiss()
+                                }
+                            }
+                        }
+                } else {
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 50))
+                            .foregroundColor(.orange)
+                        
+                        Text("Invalid Video URL")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        Text("Unable to load video for review")
+                            .foregroundColor(.secondary)
+                        
+                        Button("Close") {
+                            dismiss()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Admin Video Controller
+struct AdminVideoController: UIViewControllerRepresentable {
+    let url: URL
+    
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        let player = AVPlayer(url: url)
+        controller.player = player
+        controller.showsPlaybackControls = true
+        controller.videoGravity = .resizeAspect
+        
+        // Auto-play for admin review
+        player.play()
+        
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
+        // No updates needed
+    }
+}
+
 struct AdminLocationDetailView: View {
     let location: AbandonedLocation
     @EnvironmentObject var dataManager: DataManager
@@ -316,29 +493,41 @@ struct AdminLocationDetailView: View {
                     .background(Color(UIColor.secondarySystemBackground))
                     .cornerRadius(12)
                     
-                    // Images
-                    if !location.displayImages.isEmpty {
+                    // Images and Videos
+                    let imageURLs = location.displayImages.filter { $0.isImageURL }
+                    let videoURLs = location.displayVideos
+                    
+                    if !imageURLs.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Images (\(location.displayImages.count))")
+                            Text("Images (\(imageURLs.count))")
                                 .font(.headline)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
-                                    ForEach(0..<location.displayImages.count, id: \.self) { index in
-                                        CachedAsyncImage(url: location.displayImages[index]) { image in
-                                            image
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fill)
-                                        } placeholder: {
-                                            Rectangle()
-                                                .fill(Color.gray.opacity(0.3))
-                                                .overlay(
-                                                    ProgressView()
-                                                )
-                                        }
-                                        .frame(width: 150, height: 150)
-                                        .clipped()
-                                        .cornerRadius(8)
+                                    ForEach(0..<imageURLs.count, id: \.self) { index in
+                                        SafeMediaThumbnail(url: imageURLs[index], size: 150)
+                                            .cornerRadius(8)
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                        .padding()
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .cornerRadius(12)
+                    }
+                    
+                    // Videos section
+                    if !videoURLs.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Videos (\(videoURLs.count))")
+                                .font(.headline)
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(0..<videoURLs.count, id: \.self) { index in
+                                        SafeMediaThumbnail(url: videoURLs[index], size: 150)
+                                            .cornerRadius(8)
                                     }
                                 }
                                 .padding(.horizontal)

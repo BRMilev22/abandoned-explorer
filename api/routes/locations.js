@@ -363,8 +363,9 @@ router.get('/nearby', [
       }
     }
 
-    // Get images and tags for all locations
+    // Get images, videos and tags for all locations
     const locationImages = {};
+    const locationVideos = {};
     const locationTags = {};
     
     if (locations.length > 0) {
@@ -383,6 +384,20 @@ router.get('/nearby', [
           locationImages[img.location_id] = [];
         }
         locationImages[img.location_id].push(img.image_url);
+      });
+      
+      // Get videos
+      const [videos] = await pool.execute(
+        `SELECT location_id, video_url, thumbnail_url FROM location_videos WHERE location_id IN (${placeholders}) ORDER BY location_id, video_order`,
+        locationIds
+      );
+      
+      // Group videos by location_id
+      videos.forEach(video => {
+        if (!locationVideos[video.location_id]) {
+          locationVideos[video.location_id] = [];
+        }
+        locationVideos[video.location_id].push(video.video_url);
       });
       
       // Get tags
@@ -410,6 +425,7 @@ router.get('/nearby', [
       is_liked: userLikes.includes(location.id),
       distance_km: parseFloat(location.distance),
       images: locationImages[location.id] || [],
+      videos: locationVideos[location.id] || [],
       tags: locationTags[location.id] || []
     }));
 
@@ -550,8 +566,9 @@ router.get('/feed', [
       userLikes = likes.map(l => l.location_id);
     }
 
-    // Get images for all locations
+    // Get images and videos for all locations
     const locationImages = {};
+    const locationVideos = {};
     const locationTags = {};
     
     if (locations.length > 0) {
@@ -570,6 +587,20 @@ router.get('/feed', [
           locationImages[img.location_id] = [];
         }
         locationImages[img.location_id].push(img.image_url);
+      });
+      
+      // Get videos
+      const [videos] = await pool.execute(
+        `SELECT location_id, video_url, thumbnail_url FROM location_videos WHERE location_id IN (${placeholders}) ORDER BY location_id, video_order`,
+        locationIds
+      );
+      
+      // Group videos by location_id
+      videos.forEach(video => {
+        if (!locationVideos[video.location_id]) {
+          locationVideos[video.location_id] = [];
+        }
+        locationVideos[video.location_id].push(video.video_url);
       });
       
       // Get tags
@@ -595,6 +626,7 @@ router.get('/feed', [
       is_bookmarked: userBookmarks.includes(location.id),
       is_liked: userLikes.includes(location.id),
       images: locationImages[location.id] || [],
+      videos: locationVideos[location.id] || [],
       tags: locationTags[location.id] || []
     }));
 
@@ -665,6 +697,12 @@ router.get('/:id', async (req, res) => {
       [id]
     );
 
+    // Get location videos
+    const [videos] = await pool.execute(
+      'SELECT video_url, thumbnail_url FROM location_videos WHERE location_id = ? ORDER BY video_order',
+      [id]
+    );
+
     // Get location tags
     const [tags] = await pool.execute(`
       SELECT t.name 
@@ -703,6 +741,10 @@ router.get('/:id', async (req, res) => {
         images: images.map(img => ({
           url: img.image_url,
           thumbnail: img.thumbnail_url
+        })),
+        videos: videos.map(video => ({
+          url: video.video_url,
+          thumbnail: video.thumbnail_url
         })),
         tags: tags.map(tag => tag.name),
         is_bookmarked: isBookmarked,
@@ -1307,6 +1349,14 @@ router.get('/:id/details', optionalAuth, async (req, res) => {
       ORDER BY image_order ASC, created_at ASC
     `, [locationId]);
 
+    // Get location videos
+    const [videos] = await pool.execute(`
+      SELECT video_url, thumbnail_url, NULL as caption
+      FROM location_videos 
+      WHERE location_id = ? 
+      ORDER BY video_order ASC, created_at ASC
+    `, [locationId]);
+
     // Get location tags
     const [tags] = await pool.execute(`
       SELECT t.name, t.id
@@ -1379,6 +1429,7 @@ router.get('/:id/details', optionalAuth, async (req, res) => {
       location: {
         ...location,
         images,
+        videos,
         tags: tags.map(tag => tag.name),
         timeline,
         userInteractions

@@ -302,6 +302,35 @@ INSERT INTO `location_images` (`id`, `uuid`, `location_id`, `image_url`, `thumbn
 	(4, NULL, 3, 'http://192.168.0.116:3000/uploads/locations/3/original_1750647562513_0.jpg', 'http://192.168.0.116:3000/uploads/locations/3/thumb_1750647562513_0.jpg', 0, 1, 504761, 1920, 1080, NULL, 0, '2025-06-23 02:59:22'),
 	(5, NULL, 4, 'http://192.168.0.116:3000/uploads/locations/4/original_1750725383000_0.jpg', 'http://192.168.0.116:3000/uploads/locations/4/thumb_1750725383000_0.jpg', 0, 1, 386585, 1920, 1080, NULL, 0, '2025-06-24 00:36:23');
 
+-- Dumping structure for table abandoned_explorer.location_videos
+CREATE TABLE IF NOT EXISTS `location_videos` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) DEFAULT NULL,
+  `location_id` int(11) NOT NULL,
+  `video_url` varchar(500) NOT NULL,
+  `thumbnail_url` varchar(500) DEFAULT NULL,
+  `video_order` int(11) DEFAULT 0,
+  `uploaded_by` int(11) DEFAULT NULL,
+  `file_size` int(11) DEFAULT NULL,
+  `video_width` int(11) DEFAULT NULL,
+  `video_height` int(11) DEFAULT NULL,
+  `duration_seconds` int(11) DEFAULT NULL,
+  `alt_text` varchar(255) DEFAULT NULL,
+  `is_primary` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `uploaded_by` (`uploaded_by`),
+  KEY `idx_uuid` (`uuid`),
+  KEY `idx_location_id` (`location_id`),
+  KEY `idx_video_order` (`location_id`,`video_order`),
+  KEY `idx_primary` (`location_id`,`is_primary`),
+  CONSTRAINT `location_videos_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `location_videos_ibfk_2` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for table abandoned_explorer.location_videos: ~0 rows (approximately)
+
 -- Dumping structure for table abandoned_explorer.location_tags
 CREATE TABLE IF NOT EXISTS `location_tags` (
   `location_id` int(11) NOT NULL,

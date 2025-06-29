@@ -17,6 +17,7 @@ struct AbandonedLocation: Identifiable, Codable, Equatable {
     var address: String
     var tags: [String]
     var images: [String] // URLs or local image names
+    var videos: [String] // Video URLs
     var submittedBy: Int?
     var submittedByUsername: String?
     var submissionDate: Date
@@ -43,6 +44,17 @@ struct AbandonedLocation: Identifiable, Codable, Equatable {
         }
     }
     
+    // Computed property to get videos with corrected URLs for iOS simulator
+    var displayVideos: [String] {
+        return videos.map { videoUrl in
+            // Replace localhost with machine IP for iOS simulator
+            if videoUrl.contains("localhost:3000") {
+                return videoUrl.replacingOccurrences(of: "localhost:3000", with: "192.168.0.116:3000")
+            }
+            return videoUrl
+        }
+    }
+    
     var category: LocationCategory {
         LocationCategory(rawValue: categoryName) ?? .other
     }
@@ -53,7 +65,7 @@ struct AbandonedLocation: Identifiable, Codable, Equatable {
     
     // Custom coding keys to match API response
     enum CodingKeys: String, CodingKey {
-        case id, title, description, latitude, longitude, address, tags, images
+        case id, title, description, latitude, longitude, address, tags, images, videos
         case submittedBy = "submitted_by"
         case submittedByUsername = "submitted_by_username"
         case submissionDate = "created_at"
@@ -91,6 +103,7 @@ struct AbandonedLocation: Identifiable, Codable, Equatable {
         address = try container.decode(String.self, forKey: .address)
         tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
         images = try container.decodeIfPresent([String].self, forKey: .images) ?? []
+        videos = try container.decodeIfPresent([String].self, forKey: .videos) ?? []
         
         // Handle submittedBy - could be Int (user ID) or String (username in admin endpoints)
         submittedBy = try? container.decode(Int.self, forKey: .submittedBy)
@@ -159,6 +172,7 @@ struct AbandonedLocation: Identifiable, Codable, Equatable {
         try container.encode(address, forKey: .address)
         try container.encode(tags, forKey: .tags)
         try container.encode(images, forKey: .images)
+        try container.encode(videos, forKey: .videos)
         try container.encodeIfPresent(submittedBy, forKey: .submittedBy)
         try container.encodeIfPresent(submittedByUsername, forKey: .submittedByUsername)
         try container.encode(submissionDate, forKey: .submissionDate)
@@ -172,7 +186,7 @@ struct AbandonedLocation: Identifiable, Codable, Equatable {
     }
     
     // Convenience initializer for testing/previews
-    init(id: Int, title: String, description: String, latitude: Double, longitude: Double, address: String, tags: [String] = [], images: [String] = [], submittedBy: Int? = nil, submittedByUsername: String? = nil, submissionDate: Date = Date(), likeCount: Int = 0, bookmarkCount: Int = 0, isBookmarked: Bool = false, isLiked: Bool = false, isApproved: Bool = false, categoryName: String, dangerLevel: String) {
+    init(id: Int, title: String, description: String, latitude: Double, longitude: Double, address: String, tags: [String] = [], images: [String] = [], videos: [String] = [], submittedBy: Int? = nil, submittedByUsername: String? = nil, submissionDate: Date = Date(), likeCount: Int = 0, bookmarkCount: Int = 0, isBookmarked: Bool = false, isLiked: Bool = false, isApproved: Bool = false, categoryName: String, dangerLevel: String) {
         self.id = id
         self.title = title
         self.description = description
@@ -181,6 +195,7 @@ struct AbandonedLocation: Identifiable, Codable, Equatable {
         self.address = address
         self.tags = tags
         self.images = images
+        self.videos = videos
         self.submittedBy = submittedBy
         self.submittedByUsername = submittedByUsername
         self.submissionDate = submissionDate

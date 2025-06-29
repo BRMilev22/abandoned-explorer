@@ -444,6 +444,78 @@ class APIService: ObservableObject {
             .eraseToAnyPublisher()
     }
     
+    // MARK: - Video Upload Methods
+    func uploadVideos(for locationId: Int, videos: [URL]) -> AnyPublisher<VideoUploadResponse, APIError> {
+        guard let url = URL(string: "\(baseURL)/upload/videos") else {
+            return Fail(error: APIError.invalidURL)
+                .eraseToAnyPublisher()
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        // Set auth header
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        // Create multipart form data
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        var body = Data()
+        
+        // Add location_id field
+        body.append(contentsOf: "--\(boundary)\r\n".data(using: .utf8)!)
+        body.append(contentsOf: "Content-Disposition: form-data; name=\"location_id\"\r\n\r\n".data(using: .utf8)!)
+        body.append(contentsOf: "\(locationId)\r\n".data(using: .utf8)!)
+        
+        // Add videos
+        for (index, videoURL) in videos.enumerated() {
+            do {
+                let videoData = try Data(contentsOf: videoURL)
+                let filename = videoURL.lastPathComponent.isEmpty ? "video_\(index).mp4" : videoURL.lastPathComponent
+                
+                body.append(contentsOf: "--\(boundary)\r\n".data(using: .utf8)!)
+                body.append(contentsOf: "Content-Disposition: form-data; name=\"videos\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+                body.append(contentsOf: "Content-Type: video/mp4\r\n\r\n".data(using: .utf8)!)
+                body.append(contentsOf: videoData)
+                body.append(contentsOf: "\r\n".data(using: .utf8)!)
+            } catch {
+                print("❌ Failed to read video data from URL: \(videoURL)")
+                // Continue with other videos
+            }
+        }
+        
+        body.append(contentsOf: "--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+        
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .tryMap { output in
+                if let response = output.response as? HTTPURLResponse {
+                    if response.statusCode == 401 {
+                        self.logout()
+                        throw APIError.unauthorized
+                    }
+                    if response.statusCode >= 400 {
+                        if let errorData = try? JSONDecoder().decode(APIErrorResponse.self, from: output.data) {
+                            throw APIError.serverError(errorData.error, errorData.message)
+                        }
+                        throw APIError.serverError("Video upload failed", nil)
+                    }
+                }
+                return output.data
+            }
+            .decode(type: VideoUploadResponse.self, decoder: JSONDecoder())
+            .mapError { error in
+                if error is APIError {
+                    return error as! APIError
+                }
+                return APIError.decodingError
+            }
+            .eraseToAnyPublisher()
+    }
+    
     // MARK: - Active Users Methods
     func getActiveUsers(latitude: Double, longitude: Double, radius: Double = 50.0, activityThreshold: Int = 2) -> AnyPublisher<ActiveUsersResponse, APIError> {
         let endpoint = "/active-users/active-nearby"
@@ -830,6 +902,23 @@ struct UploadedImage: Codable {
     let order: Int
 }
 
+struct VideoUploadResponse: Codable {
+    let message: String
+    let videos: [UploadedVideo]
+    let totalUploaded: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case message, videos
+        case totalUploaded = "total_uploaded"
+    }
+}
+
+struct UploadedVideo: Codable {
+    let url: String
+    let thumbnail: String
+    let order: Int
+}
+
 // MARK: - Active Users Models
 struct ActiveUsersResponse: Codable {
     let success: Bool
@@ -1060,12 +1149,13 @@ struct LocationDetails: Codable {
     let submittedByUsername: String?
     let submittedByAvatar: String?
     let images: [LocationImage]
+    let videos: [LocationVideo]
     let tags: [String]
     let timeline: [TimelineEvent]
     let userInteractions: UserInteractions
     
     enum CodingKeys: String, CodingKey {
-        case id, title, description, latitude, longitude, address, featured, tags, timeline, images
+        case id, title, description, latitude, longitude, address, featured, tags, timeline, images, videos
         case viewsCount = "views_count"
         case likesCount = "likes_count"
         case bookmarksCount = "bookmarks_count"
@@ -1084,7 +1174,7 @@ struct LocationDetails: Codable {
     }
     
     // Memberwise initializer for direct instantiation
-    init(id: Int, title: String, description: String?, latitude: Double, longitude: Double, address: String?, viewsCount: Int, likesCount: Int, bookmarksCount: Int, commentsCount: Int, submissionDate: String, featured: Bool, categoryName: String?, categoryIcon: String?, categoryColor: String?, dangerLevel: String?, dangerColor: String?, dangerDescription: String?, riskLevel: Int?, submittedByUsername: String?, submittedByAvatar: String?, images: [LocationImage], tags: [String], timeline: [TimelineEvent], userInteractions: UserInteractions) {
+    init(id: Int, title: String, description: String?, latitude: Double, longitude: Double, address: String?, viewsCount: Int, likesCount: Int, bookmarksCount: Int, commentsCount: Int, submissionDate: String, featured: Bool, categoryName: String?, categoryIcon: String?, categoryColor: String?, dangerLevel: String?, dangerColor: String?, dangerDescription: String?, riskLevel: Int?, submittedByUsername: String?, submittedByAvatar: String?, images: [LocationImage], videos: [LocationVideo], tags: [String], timeline: [TimelineEvent], userInteractions: UserInteractions) {
         self.id = id
         self.title = title
         self.description = description
@@ -1107,6 +1197,7 @@ struct LocationDetails: Codable {
         self.submittedByUsername = submittedByUsername
         self.submittedByAvatar = submittedByAvatar
         self.images = images
+        self.videos = videos
         self.tags = tags
         self.timeline = timeline
         self.userInteractions = userInteractions
@@ -1160,19 +1251,32 @@ struct LocationDetails: Codable {
         submittedByUsername = try container.decodeIfPresent(String.self, forKey: .submittedByUsername)
         submittedByAvatar = try container.decodeIfPresent(String.self, forKey: .submittedByAvatar)
         images = try container.decode([LocationImage].self, forKey: .images)
+        videos = try container.decodeIfPresent([LocationVideo].self, forKey: .videos) ?? []
         tags = try container.decode([String].self, forKey: .tags)
         timeline = try container.decode([TimelineEvent].self, forKey: .timeline)
         userInteractions = try container.decode(UserInteractions.self, forKey: .userInteractions)
     }
 }
 
-struct LocationImage: Codable {
+struct LocationImage: Codable, Hashable {
     let imageUrl: String
     let thumbnailUrl: String?
     let caption: String?
     
     enum CodingKeys: String, CodingKey {
         case imageUrl = "image_url"
+        case thumbnailUrl = "thumbnail_url"
+        case caption
+    }
+}
+
+struct LocationVideo: Codable, Hashable {
+    let videoUrl: String
+    let thumbnailUrl: String?
+    let caption: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case videoUrl = "video_url"
         case thumbnailUrl = "thumbnail_url"
         case caption
     }

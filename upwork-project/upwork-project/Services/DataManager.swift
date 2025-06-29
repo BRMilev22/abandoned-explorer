@@ -620,7 +620,8 @@ class DataManager: ObservableObject {
         category: LocationCategory,
         dangerLevel: DangerLevel,
         tags: [String],
-        images: [UIImage] = []
+        images: [UIImage] = [],
+        videos: [URL] = []
     ) {
         guard isAuthenticated else {
             errorMessage = "You must be logged in to submit locations"
@@ -654,11 +655,18 @@ class DataManager: ObservableObject {
                 receiveValue: { [weak self] response in
                     print("DataManager: Location submitted successfully with ID: \(response.locationId)")
                     
-                    // If we have images, upload them
-                    if !images.isEmpty {
+                    let hasImages = !images.isEmpty
+                    let hasVideos = !videos.isEmpty
+                    
+                    // If we have both images and videos, upload images first then videos
+                    if hasImages && hasVideos {
+                        self?.uploadImagesAndVideos(for: response.locationId, images: images, videos: videos)
+                    } else if hasImages {
                         self?.uploadImages(for: response.locationId, images: images)
+                    } else if hasVideos {
+                        self?.uploadVideos(for: response.locationId, videos: videos)
                     } else {
-                        // No images to upload, we're done
+                        // No media to upload, we're done
                         self?.isLoading = false
                         self?.submissionSuccess = true
                         // Refresh locations to include the new submission
@@ -989,6 +997,120 @@ class DataManager: ObservableObject {
                 }
             )
             .store(in: &cancellables)
+    }
+    
+    func uploadVideos(for locationId: Int, videos: [URL]) {
+        guard isAuthenticated else {
+            errorMessage = "You must be logged in to upload videos"
+            return
+        }
+        
+        guard !videos.isEmpty else {
+            errorMessage = "No videos to upload"
+            return
+        }
+        
+        // If this is called from submitLocation, don't set isLoading again
+        let wasLoadingBefore = isLoading
+        if !wasLoadingBefore {
+            isLoading = true
+        }
+        errorMessage = nil
+        
+        apiService.uploadVideos(for: locationId, videos: videos)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    if !wasLoadingBefore {
+                        self?.isLoading = false
+                    }
+                    if case .failure(let error) = completion {
+                        self?.errorMessage = error.localizedDescription
+                        if wasLoadingBefore {
+                            // If we were called from submitLocation, we need to end the loading state
+                            self?.isLoading = false
+                        }
+                    }
+                },
+                receiveValue: { [weak self] response in
+                    print("DataManager: Videos uploaded successfully: \(response.totalUploaded) videos")
+                    
+                    if wasLoadingBefore {
+                        // This was called from submitLocation, so complete the submission
+                        self?.isLoading = false
+                        self?.submissionSuccess = true
+                    }
+                    
+                    // Refresh locations to show updated media
+                    self?.loadAllLocations()
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func uploadImagesAndVideos(for locationId: Int, images: [UIImage], videos: [URL]) {
+        guard isAuthenticated else {
+            errorMessage = "You must be logged in to upload media"
+            return
+        }
+        
+        guard !images.isEmpty || !videos.isEmpty else {
+            errorMessage = "No media to upload"
+            return
+        }
+        
+        // Track upload completion
+        var uploadsCompleted = 0
+        let totalUploads = (images.isEmpty ? 0 : 1) + (videos.isEmpty ? 0 : 1)
+        
+        func checkCompletion() {
+            uploadsCompleted += 1
+            if uploadsCompleted == totalUploads {
+                self.isLoading = false
+                self.submissionSuccess = true
+                self.loadAllLocations()
+            }
+        }
+        
+        errorMessage = nil
+        
+        // Upload images first
+        if !images.isEmpty {
+            apiService.uploadImages(for: locationId, images: images)
+                .receive(on: DispatchQueue.main)
+                .sink(
+                    receiveCompletion: { [weak self] completion in
+                        if case .failure(let error) = completion {
+                            self?.errorMessage = error.localizedDescription
+                            self?.isLoading = false
+                        }
+                    },
+                    receiveValue: { [weak self] response in
+                        print("DataManager: Images uploaded successfully: \(response.totalUploaded) images")
+                        checkCompletion()
+                    }
+                )
+                .store(in: &cancellables)
+        }
+        
+        // Upload videos
+        if !videos.isEmpty {
+            apiService.uploadVideos(for: locationId, videos: videos)
+                .receive(on: DispatchQueue.main)
+                .sink(
+                    receiveCompletion: { [weak self] completion in
+                        if case .failure(let error) = completion {
+                            self?.errorMessage = error.localizedDescription
+                            self?.isLoading = false
+                        }
+                    },
+                    receiveValue: { [weak self] response in
+                        print("DataManager: Videos uploaded successfully: \(response.totalUploaded) videos")
+                        checkCompletion()
+                    }
+                )
+                .store(in: &cancellables)
+        }
     }
     
     // MARK: - Active Users Management

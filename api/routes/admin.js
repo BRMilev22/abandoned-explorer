@@ -63,7 +63,7 @@ router.get('/locations/pending', [
       LIMIT ? OFFSET ?
     `, [limit, offset]);
 
-    // Get images for each location
+    // Get images and videos for each location
     for (let location of pendingLocations) {
       const [images] = await pool.execute(
         'SELECT image_url, thumbnail_url FROM location_images WHERE location_id = ? ORDER BY image_order',
@@ -71,6 +71,14 @@ router.get('/locations/pending', [
       );
       // Convert images to array of URLs (just the main image URLs)
       location.images = images.map(img => img.image_url);
+
+      // Get videos for each location
+      const [videos] = await pool.execute(
+        'SELECT video_url, thumbnail_url FROM location_videos WHERE location_id = ? ORDER BY video_order',
+        [location.id]
+      );
+      // Convert videos to array of URLs (just the main video URLs)
+      location.videos = videos.map(video => video.video_url);
 
       // Get tags
       const [tags] = await pool.execute(`
