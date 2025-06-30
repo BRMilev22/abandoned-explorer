@@ -5,6 +5,21 @@ const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Helper function to create notifications
+async function createNotification(userId, title, message, type, relatedType = null, relatedId = null, triggeredBy = null, data = null) {
+  try {
+    const dataJson = data ? JSON.stringify(data) : null;
+    await pool.execute(
+      'INSERT INTO notifications (user_id, title, message, type, related_type, related_id, triggered_by, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, title, message, type, relatedType, relatedId, triggeredBy, dataJson]
+    );
+    console.log(`📩 Created ${type} notification for user ${userId}`);
+  } catch (error) {
+    console.error('Failed to create notification:', error);
+    // Don't throw error - notifications are not critical
+  }
+}
+
 // All admin routes require authentication and admin privileges
 router.use(authenticateToken);
 router.use(requireAdmin);
@@ -130,7 +145,7 @@ router.post('/locations/:id/approve', async (req, res) => {
 
     // Check if location exists and is pending
     const [locations] = await pool.execute(
-      'SELECT id, submitted_by FROM locations WHERE id = ? AND is_approved = FALSE',
+      'SELECT id, title, submitted_by FROM locations WHERE id = ? AND is_approved = FALSE',
       [id]
     );
 
@@ -140,11 +155,31 @@ router.post('/locations/:id/approve', async (req, res) => {
       });
     }
 
+    const location = locations[0];
+
     // Approve the location
     await pool.execute(
       'UPDATE locations SET is_approved = TRUE, approved_by = ?, approval_date = CURRENT_TIMESTAMP WHERE id = ?',
       [req.user.userId, id]
     );
+
+    // Send approval notification to the submitter
+    if (location.submitted_by) {
+      await createNotification(
+        location.submitted_by,
+        'Location Approved! 🎉',
+        `Your location "${location.title}" has been approved and is now live!`,
+        'approval',
+        'location',
+        id,
+        req.user.userId,
+        { 
+          locationTitle: location.title, 
+          adminUsername: req.user.username,
+          status: 'approved'
+        }
+      );
+    }
 
     res.json({
       success: true,
@@ -195,9 +230,9 @@ router.delete('/locations/:id/reject', [
     const { id } = req.params;
     const { reason } = req.body;
 
-    // Check if location exists
+    // Check if location exists and get submitter info
     const [locations] = await pool.execute(
-      'SELECT id FROM locations WHERE id = ? AND is_approved = FALSE',
+      'SELECT id, title, submitted_by FROM locations WHERE id = ? AND is_approved = FALSE',
       [id]
     );
 
@@ -205,6 +240,27 @@ router.delete('/locations/:id/reject', [
       return res.status(404).json({
         error: 'Location not found'
       });
+    }
+
+    const location = locations[0];
+
+    // Send rejection notification before deleting
+    if (location.submitted_by) {
+      await createNotification(
+        location.submitted_by,
+        'Location Rejected',
+        `Your location "${location.title}" was not approved${reason ? ': ' + reason : '.'}`,
+        'rejection',
+        'location',
+        id,
+        req.user.userId,
+        { 
+          locationTitle: location.title, 
+          adminUsername: req.user.username,
+          reason: reason || 'No reason provided',
+          status: 'rejected'
+        }
+      );
     }
 
     // Delete the location (cascade will handle related records)
@@ -231,9 +287,9 @@ router.post('/locations/:id/reject', [
     const { id } = req.params;
     const { reason } = req.body;
 
-    // Check if location exists
+    // Check if location exists and get submitter info
     const [locations] = await pool.execute(
-      'SELECT id FROM locations WHERE id = ? AND is_approved = FALSE',
+      'SELECT id, title, submitted_by FROM locations WHERE id = ? AND is_approved = FALSE',
       [id]
     );
 
@@ -241,6 +297,27 @@ router.post('/locations/:id/reject', [
       return res.status(404).json({
         error: 'Location not found'
       });
+    }
+
+    const location = locations[0];
+
+    // Send rejection notification before deleting
+    if (location.submitted_by) {
+      await createNotification(
+        location.submitted_by,
+        'Location Rejected',
+        `Your location "${location.title}" was not approved${reason ? ': ' + reason : '.'}`,
+        'rejection',
+        'location',
+        id,
+        req.user.userId,
+        { 
+          locationTitle: location.title, 
+          adminUsername: req.user.username,
+          reason: reason || 'No reason provided',
+          status: 'rejected'
+        }
+      );
     }
 
     // Delete the location (cascade will handle related records)

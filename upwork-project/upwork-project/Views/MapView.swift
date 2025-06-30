@@ -21,6 +21,8 @@ struct MapView: View {
     @State private var selectedLocationCategory = "Social Map"
     @State private var showingProfile = false
     @State private var showingKeyAlerts = false
+    @State private var showingGroups = false
+    @State private var showingNotifications = false
 
     @State private var currentZoomLevel: Double = 14.0
     @State private var currentMapCenter: CLLocationCoordinate2D?
@@ -182,6 +184,7 @@ struct MapView: View {
                     selectedCategory: $selectedLocationCategory,
                     showingSelector: $showingLocationSelector,
                     showingProfile: $showingProfile,
+                    showingNotifications: $showingNotifications,
                     nearbyUserCount: nearbyUserCount,
                     isGlobalView: currentZoomLevel < 10.0,
                     currentLocationName: geocodingService.currentLocationName,
@@ -203,8 +206,10 @@ struct MapView: View {
                     userLocation: locationManager.userLocation,
                     currentZoomLevel: currentZoomLevel,
                     currentLocationName: geocodingService.currentLocationName,
-                    onKeyAlertsPressed: {
-                        showingKeyAlerts = true
+                    onGroupsPressed: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingGroups = true
+                        }
                     }
                 )
             }
@@ -227,6 +232,55 @@ struct MapView: View {
                     }
                     Spacer()
                 }
+            }
+            
+            // Custom bottom panel for groups (instead of full screen sheet)
+            if showingGroups {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingGroups = false
+                        }
+                    }
+                
+                VStack {
+                    Spacer()
+                    
+                    // Bottom panel for groups
+                    VStack(spacing: 0) {
+                        // Handle/drag indicator
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.gray.opacity(0.5))
+                            .frame(width: 40, height: 6)
+                            .padding(.top, 12)
+                            .padding(.bottom, 8)
+                        
+                        // Groups content
+                        GroupsView()
+                            .environmentObject(dataManager)
+                            .clipShape(RoundedRectangle(cornerRadius: 20))
+                    }
+                    .frame(height: UIScreen.main.bounds.height * 0.6) // 60% of screen height
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.black)
+                            .shadow(color: Color.black.opacity(0.3), radius: 10, x: 0, y: -5)
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .gesture(
+                        DragGesture()
+                            .onEnded { value in
+                                // Dismiss if dragged down significantly
+                                if value.translation.height > 100 {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        showingGroups = false
+                                    }
+                                }
+                            }
+                    )
+                }
+                .ignoresSafeArea(edges: .bottom)
             }
         }
         .preferredColorScheme(.dark)
@@ -282,6 +336,11 @@ struct MapView: View {
                 userLocation: currentMapCenter ?? locationManager.userLocation,
                 currentLocationName: geocodingService.currentLocationName
             )
+        }
+
+        .sheet(isPresented: $showingNotifications) {
+            NotificationsView()
+                .environmentObject(dataManager)
         }
         .onAppear {
             print("🗺️ MapView appeared")
@@ -1632,6 +1691,7 @@ struct MapHeaderView: View {
     @Binding var selectedCategory: String
     @Binding var showingSelector: Bool
     @Binding var showingProfile: Bool
+    @Binding var showingNotifications: Bool
     let nearbyUserCount: Int
     let isGlobalView: Bool
     let currentLocationName: String
@@ -1683,7 +1743,7 @@ struct MapHeaderView: View {
                     
                     // Notifications button in gray circle with red badge
                     Button(action: {
-                        // Notifications action
+                        showingNotifications = true
                     }) {
                         ZStack {
                             Circle()
@@ -1803,7 +1863,7 @@ struct ZoomAwareBottomBanner: View {
     let userLocation: CLLocationCoordinate2D?
     let currentZoomLevel: Double
     let currentLocationName: String
-    let onKeyAlertsPressed: () -> Void
+    let onGroupsPressed: () -> Void
     
     @State private var isExpanded = true
     @State private var dragOffset: CGFloat = 0
@@ -1892,28 +1952,22 @@ struct ZoomAwareBottomBanner: View {
                     
                     Spacer()
                     
-                    // Key alerts button (Citizen-style)
+                    // Groups button (Snapchat-style)
                     Button(action: {
-                        onKeyAlertsPressed()
+                        onGroupsPressed()
                     }) {
                         HStack(spacing: 8) {
-                            Text("Key Alerts")
-                                .font(.system(size: 16, weight: .semibold))
+                            Image(systemName: "person.3.fill")
+                                .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(.white)
                             
-                            if keyAlertsCount > 0 {
-                                Text("\(keyAlertsCount) new")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.red)
-                                    .cornerRadius(12)
-                            }
+                            Text("Groups")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .background(Color.gray.opacity(0.3))
+                        .background(Color(hex: "#7289da"))
                         .cornerRadius(20)
                     }
                 }

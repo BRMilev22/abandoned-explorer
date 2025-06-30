@@ -567,7 +567,7 @@ struct BookmarkedSection: View {
                 }
             }
         }
-                .fullScreenCover(item: $showingLocationDetail) { location in
+        .fullScreenCover(item: $showingLocationDetail) { location in
             LocationDetailModalView(location: location, selectedLocation: $showingLocationDetail)
         }
         .onAppear {

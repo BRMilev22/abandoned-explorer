@@ -332,8 +332,13 @@ enum NotificationType: String, Codable, CaseIterable {
     case comment = "comment"
     case bookmark = "bookmark"
     case approval = "approval"
-    case system = "system"
+    case rejection = "rejection"
+    case submission = "submission"
+    case reply = "reply"
     case visit = "visit"
+    case system = "system"
+    case follow = "follow"
+    case mention = "mention"
     
     var icon: String {
         switch self {
@@ -341,8 +346,13 @@ enum NotificationType: String, Codable, CaseIterable {
         case .comment: return "message.fill"
         case .bookmark: return "bookmark.fill"
         case .approval: return "checkmark.seal.fill"
-        case .system: return "gear.fill"
+        case .rejection: return "xmark.seal.fill"
+        case .submission: return "paperplane.fill"
+        case .reply: return "arrowshape.turn.up.left.fill"
         case .visit: return "location.fill"
+        case .system: return "gear.fill"
+        case .follow: return "person.badge.plus.fill"
+        case .mention: return "at.badge.plus"
         }
     }
     
@@ -352,8 +362,29 @@ enum NotificationType: String, Codable, CaseIterable {
         case .comment: return "blue"
         case .bookmark: return "orange"
         case .approval: return "green"
+        case .rejection: return "red"
+        case .submission: return "blue"
+        case .reply: return "purple"
+        case .visit: return "indigo"
         case .system: return "gray"
-        case .visit: return "purple"
+        case .follow: return "green"
+        case .mention: return "yellow"
+        }
+    }
+    
+    var displayName: String {
+        switch self {
+        case .like: return "Like"
+        case .comment: return "Comment"
+        case .bookmark: return "Bookmark"
+        case .approval: return "Approved"
+        case .rejection: return "Rejected"
+        case .submission: return "Submitted"
+        case .reply: return "Reply"
+        case .visit: return "Visit"
+        case .system: return "System"
+        case .follow: return "Follow"
+        case .mention: return "Mention"
         }
     }
 }

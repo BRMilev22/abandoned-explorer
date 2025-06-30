@@ -219,6 +219,12 @@ router.get('/notifications', authenticateToken, [
       LIMIT ? OFFSET ?
     `, [...params, limit, offset]);
 
+    // Convert MySQL TINYINT to proper boolean values
+    const formattedNotifications = notifications.map(notification => ({
+      ...notification,
+      is_read: Boolean(notification.is_read)
+    }));
+
     // Get unread count
     const [unreadCount] = await pool.execute(
       'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE',
@@ -227,8 +233,8 @@ router.get('/notifications', authenticateToken, [
 
     res.json({
       success: true,
-      notifications: notifications,
-      unreadCount: unreadCount[0].count,
+      notifications: formattedNotifications,
+      unreadCount: parseInt(unreadCount[0].count, 10),
       hasMore: notifications.length === limit
     });
   } catch (error) {

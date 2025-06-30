@@ -26,10 +26,12 @@ struct MainTabView: View {
             KeyAlertsView(
                 locations: dataManager.getApprovedLocations(),
                 userLocation: locationManager.userLocation,
-                currentLocationName: "Current Location"
+                currentLocationName: "Your Area"
             )
+                .environmentObject(dataManager)
+                .environmentObject(locationManager)
                 .tabItem {
-                    Image(systemName: "exclamationmark.triangle")
+                    Image(systemName: "exclamationmark.triangle.fill")
                     Text("Alert Community")
                 }
                 .tag(1)

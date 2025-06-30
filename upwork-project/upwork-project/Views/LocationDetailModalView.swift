@@ -42,41 +42,41 @@ struct VideoPlayerView: View {
             // Video thumbnail/preview
             Rectangle()
                 .fill(Color.black)
-                .overlay(
-                    Group {
-                        if showPlayer {
-                            VideoController(url: url, isPlaying: $isPlaying)
-                        } else {
-                            // Play button overlay
-                            VStack(spacing: 12) {
-                                Button(action: {
-                                    showPlayer = true
-                                    isPlaying = true
-                                }) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color.black.opacity(0.7))
-                                            .frame(width: 80, height: 80)
-                                        
-                                        Circle()
-                                            .stroke(Color.white, lineWidth: 3)
-                                            .frame(width: 80, height: 80)
-                                        
-                                        Image(systemName: "play.fill")
-                                            .font(.system(size: 32, weight: .medium))
-                                            .foregroundColor(.white)
-                                            .offset(x: 3) // Slight offset to center visually
-                                    }
+                            .overlay(
+                SwiftUI.Group {
+                    if showPlayer {
+                        VideoController(url: url, isPlaying: $isPlaying)
+                    } else {
+                        // Play button overlay
+                        VStack(spacing: 12) {
+                            Button(action: {
+                                showPlayer = true
+                                isPlaying = true
+                            }) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.black.opacity(0.7))
+                                        .frame(width: 80, height: 80)
+                                    
+                                    Circle()
+                                        .stroke(Color.white, lineWidth: 3)
+                                        .frame(width: 80, height: 80)
+                                    
+                                    Image(systemName: "play.fill")
+                                        .font(.system(size: 32, weight: .medium))
+                                        .foregroundColor(.white)
+                                        .offset(x: 3) // Slight offset to center visually
                                 }
-                                .buttonStyle(PlainButtonStyle())
-                                
-                                Text("Tap to play video")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.8))
                             }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            Text("Tap to play video")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
                         }
                     }
-                )
+                }
+            )
         }
     }
 }
@@ -175,6 +175,10 @@ struct LocationDetailModalView: View {
                     hideKeyboard()
                 }
             
+
+            
+
+            
             if isLoadingDetails {
                 VStack {
                     ProgressView("Loading...")
@@ -237,6 +241,35 @@ struct LocationDetailModalView: View {
                     // Fixed bottom bar (not floating)
                     modernBottomBar(details: details)
                 }
+            } else {
+                // Fallback UI using basic location data
+                VStack(spacing: 20) {
+                    Text("Basic Location View")
+                        .foregroundColor(.white)
+                        .font(.title)
+                    
+                    Text("Title: \(location.title)")
+                        .foregroundColor(.white)
+                        .font(.title2)
+                    
+                    Text("Description: \(location.description)")
+                        .foregroundColor(.gray)
+                        .font(.body)
+                    
+                    Text("Address: \(location.address)")
+                        .foregroundColor(.gray)
+                        .font(.caption)
+                    
+                    Button("Retry Loading Details") {
+                        loadLocationDetails()
+                    }
+                    .foregroundColor(.orange)
+                    .padding()
+                    .background(Color.gray.opacity(0.3))
+                    .cornerRadius(8)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding()
             }
             
             // Top navigation overlay
@@ -252,13 +285,60 @@ struct LocationDetailModalView: View {
         }
         .onAppear {
             print("🎬 LocationDetailModalView appeared for location: \(location.title) (ID: \(location.id))")
-            loadLocationDetails()
-            loadComments()
-            trackViewIfNeeded()
-            loadNearbyLocations()
             
-            // Load globally liked comments
-            likedComments = Self.globalLikedComments
+            // Create simple fallback immediately on main thread - no complex operations
+            let quickDetails = LocationDetails(
+                id: location.id,
+                title: location.title,
+                description: location.description,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                address: location.address,
+                viewsCount: 0,
+                likesCount: location.likeCount,
+                bookmarksCount: location.bookmarkCount,
+                commentsCount: 0,
+                submissionDate: "2024-01-01T00:00:00Z", // Simple fallback date
+                featured: false,
+                categoryName: location.categoryName,
+                categoryIcon: nil,
+                categoryColor: nil,
+                dangerLevel: location.dangerLevel,
+                dangerColor: nil,
+                dangerDescription: nil,
+                riskLevel: nil,
+                submittedByUsername: location.submittedByUsername,
+                submittedByAvatar: nil,
+                images: location.images.map { LocationImage(imageUrl: $0, thumbnailUrl: nil, caption: nil) },
+                videos: location.videos.map { LocationVideo(videoUrl: $0, thumbnailUrl: nil, caption: nil) },
+                tags: location.tags,
+                timeline: [],
+                userInteractions: UserInteractions(
+                    isLiked: location.isLiked,
+                    isBookmarked: location.isBookmarked,
+                    hasVisited: false
+                )
+            )
+            
+            // Set immediately for instant UI
+            locationDetails = quickDetails
+            isLoadingDetails = false
+            
+            // Move heavy operations to background
+            Task {
+                // Load fresh details from API in background
+                loadLocationDetails()
+                
+                // Load other data in background
+                await MainActor.run {
+                    loadComments()
+                    trackViewIfNeeded()
+                    loadNearbyLocations()
+                    
+                    // Load globally liked comments
+                    likedComments = Self.globalLikedComments
+                }
+            }
         }
     }
     
@@ -859,7 +939,7 @@ struct LocationDetailModalView: View {
                     
                     // Send button with gradient
                     Button(action: sendMessage) {
-                        Group {
+                        SwiftUI.Group {
                             if isPostingComment {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -872,7 +952,7 @@ struct LocationDetailModalView: View {
                         }
                         .frame(width: 40, height: 40)
                         .background(
-                            Group {
+                            SwiftUI.Group {
                                 if chatMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                     Circle()
                                         .fill(Material.ultraThinMaterial.opacity(0.5))
@@ -922,24 +1002,40 @@ struct LocationDetailModalView: View {
     }
     
     private func loadLocationDetails() {
-        isLoadingDetails = true
-        errorMessage = nil
+        print("🎬 LocationDetailModalView: Starting to load details for location ID: \(location.id)")
+        
+        // Don't set loading to true since we already have fallback content
+        // This prevents UI blocking and provides instant feedback
         
         dataManager.apiService.getLocationDetails(locationId: location.id)
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { completion in
-                    isLoadingDetails = false
+                    print("🎬 LocationDetailModalView: API call completed")
                     if case .failure(let error) = completion {
                         print("❌ Failed to load location details: \(error.localizedDescription)")
-                        errorMessage = error.localizedDescription
+                        // Don't show error immediately - user already sees content
+                        // Only show error if they try to interact with incomplete data
                     }
                 },
                 receiveValue: { response in
                     print("✅ Location details loaded: \(response.location.title)")
-                    print("📊 User interactions: liked=\(response.location.userInteractions.isLiked), bookmarked=\(response.location.userInteractions.isBookmarked), visited=\(response.location.userInteractions.hasVisited)")
-                    print("📈 Counts: likes=\(response.location.likesCount), bookmarks=\(response.location.bookmarksCount), views=\(response.location.viewsCount)")
-                    locationDetails = response.location
+                    
+                    // Update with fresh data smoothly
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        locationDetails = response.location
+                    }
+                    
+                    // Preload media for this location in background
+                    DispatchQueue.global(qos: .background).async {
+                        let mediaUrls = response.location.images.map { $0.imageUrl } + 
+                                       response.location.videos.compactMap { $0.thumbnailUrl }
+                        if !mediaUrls.isEmpty {
+                            ImageCache.shared.preloadImages(urls: mediaUrls, limitToWiFi: false)
+                        }
+                    }
+                    
+                    print("🎬 LocationDetailModalView: Updated with fresh API data")
                 }
             )
             .store(in: &cancellables)

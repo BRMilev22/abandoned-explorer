@@ -168,7 +168,7 @@ struct PendingLocationsView: View {
     @State private var showingLocationDetail: AbandonedLocation?
     
     var body: some View {
-        Group {
+        SwiftUI.Group {
             if dataManager.isLoading {
                 ProgressView("Loading pending locations...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

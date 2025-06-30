@@ -7,12 +7,14 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 // Helper function to create notifications
-async function createNotification(userId, title, message, type, relatedType = null, relatedId = null) {
+async function createNotification(userId, title, message, type, relatedType = null, relatedId = null, triggeredBy = null, data = null) {
   try {
+    const dataJson = data ? JSON.stringify(data) : null;
     await pool.execute(
-      'INSERT INTO notifications (user_id, title, message, type, related_type, related_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, title, message, type, relatedType, relatedId]
+      'INSERT INTO notifications (user_id, title, message, type, related_type, related_id, triggered_by, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [userId, title, message, type, relatedType, relatedId, triggeredBy, dataJson]
     );
+    console.log(`📩 Created ${type} notification for user ${userId}`);
   } catch (error) {
     console.error('Failed to create notification:', error);
     // Don't throw error - notifications are not critical
@@ -114,6 +116,110 @@ router.get('/categories', async (req, res) => {
     console.error('Get categories error:', error);
     res.status(500).json({
       error: 'Failed to fetch categories',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/locations/by-comment/{commentId}:
+ *   get:
+ *     summary: Get location by comment ID
+ *     tags: [Locations]
+ *     parameters:
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Location information for the comment
+ *       404:
+ *         description: Comment or location not found
+ */
+router.get('/by-comment/:commentId', async (req, res) => {
+  try {
+    const { commentId } = req.params;
+
+    // Get location ID from comment
+    const [commentResult] = await pool.execute(
+      'SELECT location_id FROM comments WHERE id = ? AND is_approved = 1',
+      [commentId]
+    );
+
+    if (commentResult.length === 0) {
+      return res.status(404).json({
+        error: 'Comment not found'
+      });
+    }
+
+    const locationId = commentResult[0].location_id;
+
+    // Get the location details
+    const [locations] = await pool.execute(`
+      SELECT 
+        l.id, l.title, l.description, l.latitude, l.longitude, l.address,
+        lc.name as category_name, lc.icon as category_icon,
+        dl.name as danger_level, dl.color as danger_color,
+        u.username as submitted_by,
+        l.created_at,
+        l.likes_count as like_count,
+        l.bookmarks_count as bookmark_count,
+        l.comments_count as comment_count,
+        l.views_count as view_count
+      FROM locations l
+      LEFT JOIN location_categories lc ON l.category_id = lc.id
+      LEFT JOIN danger_levels dl ON l.danger_level_id = dl.id
+      LEFT JOIN users u ON l.submitted_by = u.id
+      WHERE l.id = ? AND l.is_approved = TRUE
+    `, [locationId]);
+
+    if (locations.length === 0) {
+      return res.status(404).json({
+        error: 'Location not found'
+      });
+    }
+
+    const location = locations[0];
+
+    // Get location images
+    const [images] = await pool.execute(
+      'SELECT image_url, thumbnail_url FROM location_images WHERE location_id = ? ORDER BY image_order',
+      [locationId]
+    );
+
+    // Get location videos
+    const [videos] = await pool.execute(
+      'SELECT video_url, thumbnail_url FROM location_videos WHERE location_id = ? ORDER BY video_order',
+      [locationId]
+    );
+
+    // Get location tags
+    const [tags] = await pool.execute(`
+      SELECT t.name 
+      FROM tags t
+      JOIN location_tags lt ON t.id = lt.tag_id
+      WHERE lt.location_id = ?
+    `, [locationId]);
+
+    res.json({
+      success: true,
+      location: {
+        ...location,
+        images: images.map(img => img.image_url),
+        videos: videos.map(video => video.video_url),
+        tags: tags.map(tag => tag.name),
+        is_bookmarked: false,
+        is_liked: false
+      },
+      comment_id: commentId
+    });
+  } catch (error) {
+    console.error('Get location by comment error:', error);
+    res.status(500).json({
+      error: 'Failed to get location by comment',
       message: error.message
     });
   }
@@ -888,6 +994,18 @@ router.post('/', [
       }
     }
 
+    // Create submission notification for the user
+    await createNotification(
+      req.user.userId,
+      'Location Submitted',
+      `Your location "${title}" has been submitted for review`,
+      'submission',
+      'location',
+      locationId,
+      null,
+      { locationTitle: title, status: 'pending_approval' }
+    );
+
     res.status(201).json({
       message: 'Location submitted successfully',
       location_id: locationId,
@@ -926,9 +1044,9 @@ router.post('/:id/like', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if location exists
+    // Check if location exists and get owner info
     const [locations] = await pool.execute(
-      'SELECT id FROM locations WHERE id = ? AND is_approved = TRUE',
+      'SELECT id, title, submitted_by FROM locations WHERE id = ? AND is_approved = TRUE',
       [id]
     );
 
@@ -937,6 +1055,8 @@ router.post('/:id/like', authenticateToken, async (req, res) => {
         error: 'Location not found'
       });
     }
+
+    const location = locations[0];
 
     // Check if already liked
     const [existingLikes] = await pool.execute(
@@ -973,8 +1093,25 @@ router.post('/:id/like', authenticateToken, async (req, res) => {
       [likeCount[0].count, id]
     );
 
-    // Create notification
-    await createNotification(req.user.userId, 'Location Liked', `You have ${isLiked ? 'liked' : 'unliked'} a location.`, 'like', 'location', id);
+    // Create notification for location owner (but not if they liked their own location)
+    if (isLiked && location.submitted_by && location.submitted_by !== req.user.userId) {
+      // Get the user who liked the location
+      const [liker] = await pool.execute(
+        'SELECT username FROM users WHERE id = ?',
+        [req.user.userId]
+      );
+      
+      await createNotification(
+        location.submitted_by,
+        'New Like',
+        `${liker[0]?.username || 'Someone'} liked your location "${location.title}"`,
+        'like',
+        'location',
+        id,
+        req.user.userId,
+        { locationTitle: location.title, likerUsername: liker[0]?.username }
+      );
+    }
 
     res.json({
       success: true,
@@ -1014,9 +1151,9 @@ router.post('/:id/bookmark', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if location exists
+    // Check if location exists and get owner info
     const [locations] = await pool.execute(
-      'SELECT id FROM locations WHERE id = ? AND is_approved = TRUE',
+      'SELECT id, title, submitted_by FROM locations WHERE id = ? AND is_approved = TRUE',
       [id]
     );
 
@@ -1025,6 +1162,8 @@ router.post('/:id/bookmark', authenticateToken, async (req, res) => {
         error: 'Location not found'
       });
     }
+
+    const location = locations[0];
 
     // Check if already bookmarked
     const [existingBookmarks] = await pool.execute(
@@ -1061,8 +1200,25 @@ router.post('/:id/bookmark', authenticateToken, async (req, res) => {
       [bookmarkCount[0].count, id]
     );
 
-    // Create notification
-    await createNotification(req.user.userId, 'Location Bookmarked', `You have ${isBookmarked ? 'bookmarked' : 'unbookmarked'} a location.`, 'bookmark', 'location', id);
+    // Create notification for location owner (but not if they bookmarked their own location)
+    if (isBookmarked && location.submitted_by && location.submitted_by !== req.user.userId) {
+      // Get the user who bookmarked the location
+      const [bookmarker] = await pool.execute(
+        'SELECT username FROM users WHERE id = ?',
+        [req.user.userId]
+      );
+      
+      await createNotification(
+        location.submitted_by,
+        'New Bookmark',
+        `${bookmarker[0]?.username || 'Someone'} bookmarked your location "${location.title}"`,
+        'bookmark',
+        'location',
+        id,
+        req.user.userId,
+        { locationTitle: location.title, bookmarkerUsername: bookmarker[0]?.username }
+      );
+    }
 
     res.json({
       success: true,
@@ -1677,21 +1833,53 @@ router.post('/:id/comments', authenticateToken, [
       WHERE c.id = ?
     `, [result.insertId]);
 
-    // Create notification for location owner (if not commenting on own location)
-    const [locationOwner] = await pool.execute(
-      'SELECT submitted_by FROM locations WHERE id = ?',
+    // Create notifications
+    const [locationInfo] = await pool.execute(
+      'SELECT title, submitted_by FROM locations WHERE id = ?',
       [locationId]
     );
 
-    if (locationOwner[0]?.submitted_by && locationOwner[0].submitted_by !== userId) {
+    // Notification for location owner (if not commenting on own location)
+    if (locationInfo[0]?.submitted_by && locationInfo[0].submitted_by !== userId) {
       await createNotification(
-        locationOwner[0].submitted_by,
+        locationInfo[0].submitted_by,
         'New Comment',
-        `${req.user.username} commented on your location`,
+        `${req.user.username} commented on your location "${locationInfo[0].title}"`,
         'comment',
         'location',
-        locationId
+        locationId,
+        userId,
+        { 
+          locationTitle: locationInfo[0].title, 
+          commenterUsername: req.user.username,
+          commentText: comment_text.substring(0, 100) // First 100 chars
+        }
       );
+    }
+
+    // Notification for parent comment owner (if this is a reply)
+    if (parent_comment_id) {
+      const [parentCommentInfo] = await pool.execute(
+        'SELECT user_id FROM comments WHERE id = ?',
+        [parent_comment_id]
+      );
+
+      if (parentCommentInfo[0]?.user_id && parentCommentInfo[0].user_id !== userId) {
+        await createNotification(
+          parentCommentInfo[0].user_id,
+          'New Reply',
+          `${req.user.username} replied to your comment`,
+          'reply',
+          'comment',
+          parent_comment_id,
+          userId,
+          { 
+            locationTitle: locationInfo[0].title,
+            commenterUsername: req.user.username,
+            replyText: comment_text.substring(0, 100)
+          }
+        );
+      }
     }
 
     res.status(201).json({

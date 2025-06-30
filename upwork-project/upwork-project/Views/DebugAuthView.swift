@@ -17,7 +17,7 @@ struct DebugAuthView: View {
                 .font(.title)
                 .fontWeight(.bold)
             
-            Group {
+            SwiftUI.Group {
                 Text("Is Authenticated: \(dataManager.isAuthenticated ? "✅" : "❌")")
                 Text("Is Admin: \(dataManager.isAdmin ? "✅" : "❌")")
                 Text("Current User: \(dataManager.currentUser?.username ?? "None")")

@@ -59,6 +59,18 @@ class DataManager: ObservableObject {
     @Published var isLoadingStats = false
     @Published var isLoadingVisitedLocations = false
     
+    // MARK: - Groups Properties
+    @Published var userGroups: [Group] = []
+    @Published var selectedGroup: Group?
+    @Published var groupMembers: [GroupMember] = []
+    @Published var groupMessages: [GroupMessage] = []
+    @Published var isLoadingGroups = false
+    @Published var isLoadingGroupMembers = false
+    @Published var isLoadingGroupMessages = false
+    @Published var isCreatingGroup = false
+    @Published var isJoiningGroup = false
+    @Published var isSendingMessage = false
+    
     let apiService = APIService.shared
     private var cancellables = Set<AnyCancellable>()
     
@@ -124,6 +136,7 @@ class DataManager: ObservableObject {
                         self?.loadNotifications()
                         self?.loadUserPreferences()
                         self?.loadVisitedLocations()
+                        self?.loadUserGroups()
                     } else {
                         // Clear user data on logout
                         self?.currentUser = nil
@@ -135,6 +148,10 @@ class DataManager: ObservableObject {
                         self?.unreadNotificationCount = 0
                         self?.userPreferences = UserPreferences()
                         self?.visitedLocations = []
+                        self?.userGroups = []
+                        self?.selectedGroup = nil
+                        self?.groupMembers = []
+                        self?.groupMessages = []
                     }
                 }
             }
@@ -1358,6 +1375,110 @@ class DataManager: ObservableObject {
             .store(in: &cancellables)
     }
     
+    func fetchLocationDetails(locationId: Int) async throws -> AbandonedLocation {
+        print("🔍 Fetching location details for ID: \(locationId)")
+        
+        // First check if location is in cache
+        if let cachedLocation = getApprovedLocations().first(where: { $0.id == locationId }) {
+            print("✅ Found location in cache: \(cachedLocation.title)")
+            return cachedLocation
+        }
+        
+        // Also check pending locations for admin users
+        if currentUser?.id == 1 { // Admin user
+            if let pendingLocation = pendingLocations.first(where: { $0.id == locationId }) {
+                print("✅ Found pending location: \(pendingLocation.title)")
+                return pendingLocation
+            }
+        }
+        
+        // If not in cache, fetch from API
+        print("📡 Location not in cache, fetching from API...")
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            apiService.getLocationByIdFromAPI(locationId)
+                .receive(on: DispatchQueue.main)
+                .sink(
+                    receiveCompletion: { completion in
+                        if case .failure(let error) = completion {
+                            print("❌ Failed to fetch location \(locationId): \(error)")
+                            continuation.resume(throwing: error)
+                        }
+                    },
+                    receiveValue: { response in
+                        print("✅ Successfully fetched location from API: \(response.location.title)")
+                        
+                        // Convert LocationDetails to AbandonedLocation
+                        let abandonedLocation = AbandonedLocation(
+                            id: response.location.id,
+                            title: response.location.title,
+                            description: response.location.description ?? "",
+                            latitude: response.location.latitude,
+                            longitude: response.location.longitude,
+                            address: response.location.address ?? "",
+                            tags: response.location.tags,
+                            images: response.location.images.map { $0.imageUrl },
+                            videos: response.location.videos.map { $0.videoUrl },
+                            submittedBy: nil,
+                            submittedByUsername: response.location.submittedByUsername,
+                            submissionDate: self.parseSubmissionDate(response.location.submissionDate),
+                            likeCount: response.location.likesCount,
+                            bookmarkCount: response.location.bookmarksCount,
+                            isBookmarked: response.location.userInteractions.isBookmarked,
+                            isLiked: response.location.userInteractions.isLiked,
+                            isApproved: true,
+                            categoryName: response.location.categoryName ?? "",
+                            dangerLevel: response.location.dangerLevel ?? ""
+                        )
+                        
+                        // Add to cache for future use
+                        DispatchQueue.main.async {
+                            self.locations.append(abandonedLocation)
+                        }
+                        
+                        continuation.resume(returning: abandonedLocation)
+                    }
+                )
+                .store(in: &self.cancellables)
+        }
+    }
+    
+    private func parseSubmissionDate(_ dateString: String) -> Date {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.date(from: dateString) ?? Date()
+    }
+    
+    func fetchLocationByCommentId(_ commentId: Int) async throws -> AbandonedLocation {
+        print("🔍 Fetching location for comment ID: \(commentId)")
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            apiService.getLocationByCommentId(commentId)
+                .receive(on: DispatchQueue.main)
+                .sink(
+                    receiveCompletion: { completion in
+                        if case .failure(let error) = completion {
+                            print("❌ Failed to fetch location by comment \(commentId): \(error)")
+                            continuation.resume(throwing: error)
+                        }
+                    },
+                    receiveValue: { response in
+                        print("✅ Successfully fetched location by comment: \(response.location.title)")
+                        
+                        // Add to cache for future use if not already present
+                        DispatchQueue.main.async {
+                            if !self.locations.contains(where: { $0.id == response.location.id }) {
+                                self.locations.append(response.location)
+                            }
+                        }
+                        
+                        continuation.resume(returning: response.location)
+                    }
+                )
+                .store(in: &self.cancellables)
+        }
+    }
+    
     func trackLocationVisit(_ locationId: Int) {
         apiService.trackLocationVisit(locationId: locationId)
             .receive(on: DispatchQueue.main)
@@ -1428,6 +1549,315 @@ class DataManager: ObservableObject {
                     }
                     // Update unread count
                     self?.unreadNotificationCount = max(0, (self?.unreadNotificationCount ?? 0) - 1)
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func markAllNotificationsAsRead() {
+        // Mark all local notifications as read
+        for i in 0..<notifications.count {
+            if !notifications[i].isRead {
+                let notification = notifications[i]
+                let updatedNotification = LocationNotification(
+                    id: notification.id,
+                    title: notification.title,
+                    message: notification.message,
+                    type: notification.type,
+                    relatedType: notification.relatedType,
+                    relatedId: notification.relatedId,
+                    isRead: true,
+                    createdAt: notification.createdAt
+                )
+                notifications[i] = updatedNotification
+            }
+        }
+        
+        // Reset unread count
+        unreadNotificationCount = 0
+        
+        // Call API to mark all as read
+        apiService.markAllNotificationsAsRead()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to mark all notifications as read: \(error.localizedDescription)")
+                    }
+                },
+                receiveValue: { response in
+                    print("✅ All notifications marked as read")
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    // MARK: - Groups Management
+    
+    func loadUserGroups() {
+        guard isAuthenticated, !isLoadingGroups else { return }
+        
+        isLoadingGroups = true
+        print("👥 Loading user groups...")
+        
+        apiService.getUserGroups()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    self?.isLoadingGroups = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to load user groups: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] response in
+                    print("✅ User groups loaded: \(response.groups.count) groups")
+                    self?.userGroups = response.groups
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func createGroup(name: String, description: String?, isPrivate: Bool, memberLimit: Int, avatarColor: String, emoji: String) {
+        guard isAuthenticated, !isCreatingGroup else { return }
+        
+        isCreatingGroup = true
+        errorMessage = nil
+        print("👥 Creating group: \(name)")
+        
+        let request = CreateGroupRequest(
+            name: name,
+            description: description,
+            isPrivate: isPrivate,
+            memberLimit: memberLimit,
+            avatarColor: avatarColor,
+            emoji: emoji
+        )
+        
+        apiService.createGroup(request)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    self?.isCreatingGroup = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to create group: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] response in
+                    print("✅ Group created successfully: \(response.group.name)")
+                    // Add to local groups
+                    self?.userGroups.append(response.group)
+                    self?.selectedGroup = response.group
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func joinGroup(inviteCode: String) {
+        guard isAuthenticated, !isJoiningGroup else { return }
+        
+        isJoiningGroup = true
+        errorMessage = nil
+        print("👥 Joining group with code: \(inviteCode)")
+        
+        let request = JoinGroupRequest(inviteCode: inviteCode)
+        
+        apiService.joinGroup(request)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    self?.isJoiningGroup = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to join group: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] response in
+                    print("✅ Successfully joined group: \(response.group.name)")
+                    // Add to local groups if not already present
+                    if !(self?.userGroups.contains(where: { $0.id == response.group.id }) ?? false) {
+                        self?.userGroups.append(response.group)
+                    }
+                    self?.selectedGroup = response.group
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func loadGroupMembers(_ groupId: Int) {
+        guard isAuthenticated, !isLoadingGroupMembers else { return }
+        
+        isLoadingGroupMembers = true
+        print("👥 Loading group members for group \(groupId)")
+        
+        apiService.getGroupMembers(groupId)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    self?.isLoadingGroupMembers = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to load group members: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] response in
+                    print("✅ Group members loaded: \(response.members.count) members")
+                    self?.groupMembers = response.members
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func loadGroupMessages(_ groupId: Int, before: Date? = nil, limit: Int = 50) {
+        guard isAuthenticated, !isLoadingGroupMessages else { return }
+        
+        isLoadingGroupMessages = true
+        print("💬 Loading group messages for group \(groupId)")
+        
+        apiService.getGroupMessages(groupId, before: before, limit: limit)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    self?.isLoadingGroupMessages = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to load group messages: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] response in
+                    print("✅ Group messages loaded: \(response.messages.count) messages")
+                    if before == nil {
+                        // New load - replace messages
+                        self?.groupMessages = response.messages
+                    } else {
+                        // Load more - prepend messages
+                        self?.groupMessages = response.messages + (self?.groupMessages ?? [])
+                    }
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func sendGroupMessage(_ groupId: Int, content: String, messageType: MessageType = .text, locationId: Int? = nil, replyToId: Int? = nil) {
+        guard isAuthenticated, !isSendingMessage else { return }
+        
+        isSendingMessage = true
+        print("💬 Sending message to group \(groupId): \(content)")
+        
+        let request = SendMessageRequest(
+            messageType: messageType.rawValue,
+            content: content,
+            locationId: locationId,
+            replyToId: replyToId
+        )
+        
+        apiService.sendGroupMessage(groupId, request)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    self?.isSendingMessage = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to send message: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] response in
+                    print("✅ Message sent successfully")
+                    // Add to local messages
+                    self?.groupMessages.append(response.message)
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func leaveGroup(_ groupId: Int) {
+        guard isAuthenticated else { return }
+        
+        print("👥 Leaving group \(groupId)")
+        
+        apiService.leaveGroup(groupId)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to leave group: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] response in
+                    print("✅ Successfully left group")
+                    // Remove from local groups
+                    self?.userGroups.removeAll { $0.id == groupId }
+                    // Clear selection if this was the selected group
+                    if self?.selectedGroup?.id == groupId {
+                        self?.selectedGroup = nil
+                        self?.groupMembers = []
+                        self?.groupMessages = []
+                    }
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func shareLocationToGroup(_ groupId: Int, locationId: Int, notes: String? = nil, isPinned: Bool = false) {
+        guard isAuthenticated else { return }
+        
+        print("📍 Sharing location \(locationId) to group \(groupId)")
+        
+        let request = ShareLocationRequest(
+            locationId: locationId,
+            notes: notes,
+            isPinned: isPinned
+        )
+        
+        apiService.shareLocationToGroup(groupId, request)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to share location: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] response in
+                    print("✅ Location shared to group successfully")
+                    // Reload messages to show the shared location
+                    self?.loadGroupMessages(groupId)
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func selectGroup(_ group: Group) {
+        selectedGroup = group
+        // Clear existing data
+        groupMembers = []
+        groupMessages = []
+        // Load group data
+        loadGroupMembers(group.id)
+        loadGroupMessages(group.id)
+    }
+    
+    func clearGroupSelection() {
+        selectedGroup = nil
+        groupMembers = []
+        groupMessages = []
+    }
+    
+    func updateMemberActivity(_ groupId: Int) {
+        guard isAuthenticated else { return }
+        
+        apiService.updateMemberActivity(groupId)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to update member activity: \(error.localizedDescription)")
+                    }
+                },
+                receiveValue: { response in
+                    print("✅ Member activity updated for group \(groupId)")
                 }
             )
             .store(in: &cancellables)

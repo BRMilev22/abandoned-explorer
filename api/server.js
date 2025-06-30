@@ -17,6 +17,7 @@ const userRoutes = require('./routes/users');
 const uploadRoutes = require('./routes/upload_local');
 const adminRoutes = require('./routes/admin');
 const activeUsersRoutes = require('./routes/active_users');
+const groupRoutes = require('./routes/groups');
 
 const app = express();
 const PORT = 3000;
@@ -129,6 +130,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/active-users', activeUsersRoutes);
+app.use('/api/groups', groupRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

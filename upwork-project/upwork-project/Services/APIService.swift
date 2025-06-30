@@ -251,6 +251,14 @@ class APIService: ObservableObject {
         return makeRequest(endpoint: "/locations/\(id)", responseType: AbandonedLocation.self)
     }
     
+    func getLocationByIdFromAPI(_ id: Int) -> AnyPublisher<LocationDetailsResponse, APIError> {
+        return makeRequest(endpoint: "/locations/\(id)/details", responseType: LocationDetailsResponse.self)
+    }
+    
+    func getLocationByCommentId(_ commentId: Int) -> AnyPublisher<LocationByCommentResponse, APIError> {
+        return makeRequest(endpoint: "/locations/by-comment/\(commentId)", responseType: LocationByCommentResponse.self)
+    }
+    
     func submitLocation(_ location: LocationSubmission) -> AnyPublisher<LocationSubmissionResponse, APIError> {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -721,6 +729,76 @@ class APIService: ObservableObject {
             method: .POST,
             responseType: VisitResponse.self
         )
+    }
+    
+    // MARK: - Groups API Methods
+    
+    func getUserGroups() -> AnyPublisher<GroupsResponse, APIError> {
+        return makeRequest(endpoint: "/groups/my-groups", responseType: GroupsResponse.self)
+    }
+    
+    func createGroup(_ request: CreateGroupRequest) -> AnyPublisher<GroupResponse, APIError> {
+        let encoder = JSONEncoder()
+        guard let data = try? encoder.encode(request) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(endpoint: "/groups", method: .POST, body: data, responseType: GroupResponse.self)
+    }
+    
+    func joinGroup(_ request: JoinGroupRequest) -> AnyPublisher<GroupResponse, APIError> {
+        let encoder = JSONEncoder()
+        guard let data = try? encoder.encode(request) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(endpoint: "/groups/join", method: .POST, body: data, responseType: GroupResponse.self)
+    }
+    
+    func getGroupMessages(_ groupId: Int, before: Date? = nil, limit: Int = 50) -> AnyPublisher<GroupMessagesResponse, APIError> {
+        var endpoint = "/groups/\(groupId)/messages?limit=\(limit)"
+        
+        if let before = before {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            endpoint += "&before=\(formatter.string(from: before))"
+        }
+        
+        return makeRequest(endpoint: endpoint, responseType: GroupMessagesResponse.self)
+    }
+    
+    func sendGroupMessage(_ groupId: Int, _ request: SendMessageRequest) -> AnyPublisher<MessageResponse, APIError> {
+        let encoder = JSONEncoder()
+        guard let data = try? encoder.encode(request) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(endpoint: "/groups/\(groupId)/messages", method: .POST, body: data, responseType: MessageResponse.self)
+    }
+    
+    func leaveGroup(_ groupId: Int) -> AnyPublisher<APISuccessResponse, APIError> {
+        return makeRequest(endpoint: "/groups/\(groupId)/leave", method: .DELETE, responseType: APISuccessResponse.self)
+    }
+    
+    func shareLocationToGroup(_ groupId: Int, _ request: ShareLocationRequest) -> AnyPublisher<APISuccessResponse, APIError> {
+        let encoder = JSONEncoder()
+        guard let data = try? encoder.encode(request) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(endpoint: "/groups/\(groupId)/share-location", method: .POST, body: data, responseType: APISuccessResponse.self)
+    }
+    
+    func getGroupMembers(_ groupId: Int) -> AnyPublisher<GroupMembersResponse, APIError> {
+        return makeRequest(endpoint: "/groups/\(groupId)/members", responseType: GroupMembersResponse.self)
+    }
+    
+    func updateMemberActivity(_ groupId: Int) -> AnyPublisher<APISuccessResponse, APIError> {
+        return makeRequest(endpoint: "/groups/\(groupId)/activity", method: .POST, responseType: APISuccessResponse.self)
     }
 }
 
@@ -1383,5 +1461,32 @@ struct ToggleBookmarkResponse: Codable {
     enum CodingKeys: String, CodingKey {
         case success, message
         case isBookmarked = "isBookmarked"
+    }
+}
+
+struct LocationByCommentResponse: Codable {
+    let success: Bool
+    let location: AbandonedLocation
+    let commentId: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case success, location
+        case commentId = "comment_id"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        success = try container.decode(Bool.self, forKey: .success)
+        location = try container.decode(AbandonedLocation.self, forKey: .location)
+        
+        // Handle commentId which might come as string or int
+        if let commentIdInt = try? container.decode(Int.self, forKey: .commentId) {
+            commentId = commentIdInt
+        } else if let commentIdString = try? container.decode(String.self, forKey: .commentId) {
+            commentId = Int(commentIdString) ?? 0
+        } else {
+            commentId = 0
+        }
     }
 }
