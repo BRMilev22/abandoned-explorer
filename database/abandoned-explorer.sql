@@ -1050,6 +1050,22 @@ CREATE TABLE IF NOT EXISTS `group_locations` (
 
 -- Dumping data for table abandoned_explorer.group_locations: ~0 rows (approximately)
 
+-- Dumping structure for table abandoned_explorer.group_message_likes
+CREATE TABLE IF NOT EXISTS `group_message_likes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `message_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_message_like` (`message_id`,`user_id`),
+  KEY `idx_message_likes` (`message_id`),
+  KEY `idx_user_likes` (`user_id`),
+  CONSTRAINT `group_message_likes_ibfk_1` FOREIGN KEY (`message_id`) REFERENCES `group_messages` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_message_likes_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for table abandoned_explorer.group_message_likes: ~0 rows (approximately)
+
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
 /*!40014 SET FOREIGN_KEY_CHECKS=IFNULL(@OLD_FOREIGN_KEY_CHECKS, 1) */;

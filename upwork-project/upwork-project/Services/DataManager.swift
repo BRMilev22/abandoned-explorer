@@ -1764,8 +1764,12 @@ class DataManager: ObservableObject {
                 },
                 receiveValue: { [weak self] response in
                     print("✅ Message sent successfully")
-                    // Add to local messages
+                    // Add to local messages and sort by creation date
                     self?.groupMessages.append(response.message)
+                    self?.groupMessages.sort { $0.createdAt < $1.createdAt }
+                    
+                    // Update member activity when sending a message
+                    self?.updateMemberActivity(groupId)
                 }
             )
             .store(in: &cancellables)
@@ -1858,6 +1862,29 @@ class DataManager: ObservableObject {
                 },
                 receiveValue: { response in
                     print("✅ Member activity updated for group \(groupId)")
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func likeGroupMessage(_ groupId: Int, messageId: Int) {
+        guard isAuthenticated else { return }
+        
+        print("❤️ Liking message \(messageId) in group \(groupId)")
+        
+        apiService.likeGroupMessage(groupId, messageId: messageId)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to like message: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] response in
+                    print("✅ Message like status updated")
+                    // In a real app, you'd update the local message like count and status
+                    // For now, we'll just show the action worked
                 }
             )
             .store(in: &cancellables)

@@ -800,6 +800,10 @@ class APIService: ObservableObject {
     func updateMemberActivity(_ groupId: Int) -> AnyPublisher<APISuccessResponse, APIError> {
         return makeRequest(endpoint: "/groups/\(groupId)/activity", method: .POST, responseType: APISuccessResponse.self)
     }
+    
+    func likeGroupMessage(_ groupId: Int, messageId: Int) -> AnyPublisher<APISuccessResponse, APIError> {
+        return makeRequest(endpoint: "/groups/\(groupId)/messages/\(messageId)/like", method: .POST, responseType: APISuccessResponse.self)
+    }
 }
 
 // MARK: - HTTP Methods

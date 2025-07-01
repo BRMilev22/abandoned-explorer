@@ -13,6 +13,10 @@ struct GroupsView: View {
     @State private var selectedTab = 0
     @State private var showingCreateGroup = false
     @State private var showingJoinGroup = false
+    @State private var keyboardHeight: CGFloat = 0
+    @State private var cancellables = Set<AnyCancellable>()
+    @State private var isViewVisible = false
+    @State private var messageAppearDelay: Double = 0
     
     let accentColor = Color(hex: "#7289da")
     
@@ -22,27 +26,54 @@ struct GroupsView: View {
         VStack(spacing: 0) {
             if dataManager.userGroups.isEmpty {
                 emptyGroupState
+                    .opacity(isViewVisible ? 1 : 0)
+                    .scaleEffect(isViewVisible ? 1 : 0.95)
+                    .animation(.easeInOut(duration: 0.6).delay(0.2), value: isViewVisible)
             } else {
                 // Content for when groups exist
                 groupContent
+                    .opacity(isViewVisible ? 1 : 0)
+                    .offset(y: isViewVisible ? 0 : 30)
+                    .animation(.spring(response: 0.8, dampingFraction: 0.8, blendDuration: 0), value: isViewVisible)
             }
         }
-        .background(Color.black)
+        .background(
+            Color.black
+                .opacity(isViewVisible ? 1 : 0)
+                .animation(.easeInOut(duration: 0.4), value: isViewVisible)
+        )
         .sheet(isPresented: $showingCreateGroup) {
             CreateGroupView()
                 .environmentObject(dataManager)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingJoinGroup) {
             JoinGroupView()
                 .environmentObject(dataManager)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .onAppear {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isViewVisible = true
+            }
+            
             dataManager.loadUserGroups()
             // Load members for the first group if available
             if let firstGroup = dataManager.userGroups.first {
                 dataManager.loadGroupMembers(firstGroup.id)
                 dataManager.updateMemberActivity(firstGroup.id)
             }
+            // Setup keyboard observers
+            setupKeyboardObservers()
+        }
+        .onDisappear {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                isViewVisible = false
+            }
+            // Clean up keyboard observers
+            cancellables.removeAll()
         }
         .onChange(of: dataManager.userGroups) { groups in
             // When groups are loaded, load members for the first group
@@ -72,16 +103,42 @@ struct GroupsView: View {
             topSection
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
-            
-            // Tab content
-            ScrollView {
-                VStack(spacing: 20) {
-                    if let firstGroup = dataManager.userGroups.first {
-                        tabContentView(for: firstGroup)
-                    }
+                .onTapGesture {
+                    // Dismiss keyboard when tapping on top section
+                    dismissKeyboard()
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
+            
+            // Tab content with smooth transitions
+            if selectedTab == 2 { // Chat tab - special handling for keyboard
+                if let firstGroup = dataManager.userGroups.first {
+                    chatTabView(for: firstGroup)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .move(edge: .leading).combined(with: .opacity)
+                        ))
+                }
+            } else {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        if let firstGroup = dataManager.userGroups.first {
+                            tabContentView(for: firstGroup)
+                                .opacity(isViewVisible ? 1 : 0)
+                                .offset(y: isViewVisible ? 0 : 20)
+                                .animation(.spring(response: 0.6, dampingFraction: 0.8)
+                                          .delay(0.1), value: isViewVisible)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                }
+                .transition(.asymmetric(
+                    insertion: .move(edge: .leading).combined(with: .opacity),
+                    removal: .move(edge: .trailing).combined(with: .opacity)
+                ))
+                .onTapGesture {
+                    // Dismiss keyboard when tapping on other tabs
+                    dismissKeyboard()
+                }
             }
         }
     }
@@ -132,7 +189,10 @@ struct GroupsView: View {
                     HStack(spacing: 8) {
                         ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
                             Button(action: {
-                                withAnimation(.easeInOut(duration: 0.2)) {
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                impactFeedback.impactOccurred()
+                                
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.7, blendDuration: 0)) {
                                     selectedTab = index
                                 }
                             }) {
@@ -148,9 +208,13 @@ struct GroupsView: View {
                                                 RoundedRectangle(cornerRadius: 20)
                                                     .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                                             )
+                                            .scaleEffect(selectedTab == index ? 1.0 : 0.95)
+                                            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selectedTab)
                                     )
                             }
                             .buttonStyle(PlainButtonStyle())
+                            .scaleEffect(selectedTab == index ? 1.05 : 1.0)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.6), value: selectedTab)
                         }
                     }
                     .padding(.horizontal, 4)
@@ -366,8 +430,6 @@ struct GroupsView: View {
             activityTabView(for: group)
         case 1: // Members
             membersTabView(for: group)
-        case 2: // Chat
-            chatTabView(for: group)
         case 3: // Locations
             locationsTabView(for: group)
         case 4: // Settings
@@ -475,111 +537,338 @@ struct GroupsView: View {
         )
     }
     
-    private func chatTabView(for group: Group) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Group Chat")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white)
-            
-            VStack(spacing: 16) {
-                if dataManager.isLoadingGroupMessages {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: accentColor))
-                        Spacer()
-                    }
-                    .padding(.vertical, 40)
-                } else if dataManager.groupMessages.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "message.circle")
-                            .font(.system(size: 40))
-                            .foregroundColor(.gray)
-                        
-                        Text("No messages yet")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.gray)
-                        
-                        Text("Be the first to start the conversation!")
-                            .font(.system(size: 14))
-                            .foregroundColor(.gray.opacity(0.7))
-                    }
-                    .padding(.vertical, 40)
-                } else {
-                    LazyVStack(spacing: 12) {
-                        ForEach(dataManager.groupMessages.suffix(10)) { message in
-                            messageRowView(message: message)
+        private func chatTabView(for group: Group) -> some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // Compact messages area - fixed height that leaves room for everything
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            if dataManager.isLoadingGroupMessages {
+                                HStack {
+                                    Spacer()
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: accentColor))
+                                    Spacer()
+                                }
+                                .padding(.vertical, 20)
+                            } else if dataManager.groupMessages.isEmpty {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "message.circle")
+                                        .font(.system(size: 30))
+                                        .foregroundColor(.gray)
+                                    
+                                    Text("No messages yet")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.white)
+                                    
+                                    Text("Start the conversation!")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.gray)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 120)
+                            } else {
+                                ForEach(Array(dataManager.groupMessages.enumerated()), id: \.element.id) { index, message in
+                                    compactMessageRowView(message: message)
+                                        .id(message.id)
+                                        .opacity(isViewVisible ? 1 : 0)
+                                        .offset(x: isViewVisible ? 0 : -30)
+                                        .animation(.spring(response: 0.6, dampingFraction: 0.8)
+                                                  .delay(Double(index) * 0.1), value: isViewVisible)
+                                }
+                            }
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
                     }
-                }
-                
-                // Quick message input
-                Button(action: {
-                    // TODO: Open chat modal
-                }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "message.fill")
-                            .foregroundColor(accentColor)
-                        
-                        Text("Send a message...")
-                            .foregroundColor(.gray)
-                        
-                        Spacer()
-                        
-                        Image(systemName: "arrow.up.circle.fill")
-                            .foregroundColor(accentColor)
-                    }
-                    .padding(16)
+                    .frame(height: keyboardHeight > 0 ? 
+                           max(120, geometry.size.height - keyboardHeight - 240) : // When keyboard visible: leave room for input + keyboard + bottom nav
+                           geometry.size.height - 200) // When keyboard hidden: leave room for input + bottom nav
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.white.opacity(0.05))
+                            .fill(Color.white.opacity(0.02))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color.white.opacity(0.1), lineWidth: 1)
                             )
                     )
+                    .padding(.horizontal, 16)
+                    .onTapGesture {
+                        dismissKeyboard()
+                    }
+                    .onChange(of: dataManager.groupMessages.count) { _ in
+                        if let lastMessage = dataManager.groupMessages.last {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
+                        }
+                    }
+                    .onChange(of: keyboardHeight) { _ in
+                        if let lastMessage = dataManager.groupMessages.last {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            }
+                        }
+                    }
                 }
+                
+                Spacer(minLength: 8)
+                
+                // Input field - always visible at bottom
+                ChatInputView(groupId: group.id, replyingTo: $replyingToMessage)
+                    .environmentObject(dataManager)
+                    .background(
+                        Rectangle()
+                            .fill(Color.black)
+                            .overlay(
+                                Rectangle()
+                                    .fill(Color.white.opacity(keyboardHeight > 0 ? 0.12 : 0.08))
+                                    .animation(.easeInOut(duration: 0.3), value: keyboardHeight)
+                            )
+                            .shadow(color: .black.opacity(keyboardHeight > 0 ? 0.3 : 0.1), 
+                                   radius: keyboardHeight > 0 ? 8 : 4, x: 0, y: -2)
+                            .animation(.easeInOut(duration: 0.3), value: keyboardHeight)
+                    )
+                    .scaleEffect(keyboardHeight > 0 ? 1.02 : 1.0)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: keyboardHeight)
+                    .padding(.bottom, keyboardHeight + 100) // Move up with keyboard + space for bottom nav
             }
+            .background(Color.black)
         }
     }
     
-    private func messageRowView(message: GroupMessage) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Avatar
-            Circle()
-                .fill(accentColor.opacity(0.2))
-                .frame(width: 32, height: 32)
-                .overlay(
-                    Text(String(message.username.prefix(1).uppercased()))
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
-                )
-            
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(message.username)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
+    @State private var replyingToMessage: GroupMessage?
+    
+    private func compactMessageRowView(message: GroupMessage) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .top, spacing: 8) {
+                // Smaller avatar
+                Circle()
+                    .fill(accentColor.opacity(0.2))
+                    .frame(width: 28, height: 28)
+                    .overlay(
+                        Text(String(message.username.prefix(1).uppercased()))
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white)
+                    )
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    // Compact header
+                    HStack(spacing: 6) {
+                        Text(message.username)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        Text(message.createdAt, style: .time)
+                            .font(.system(size: 10))
+                            .foregroundColor(.gray)
+                        
+                        Spacer()
+                    }
                     
-                    Text(message.createdAt, style: .time)
-                        .font(.system(size: 12))
-                        .foregroundColor(.gray)
+                    // Message content
+                    if let content = message.content, !content.isEmpty {
+                        Text(content)
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.9))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    
+                    // Compact action buttons
+                    HStack(spacing: 12) {
+                        Button(action: { likeMessage(message) }) {
+                            HStack(spacing: 2) {
+                                Image(systemName: "heart.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.red.opacity(0.7))
+                                Text("0")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        Button(action: { replyToMessage(message) }) {
+                            HStack(spacing: 2) {
+                                Image(systemName: "arrowshape.turn.up.left")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.gray)
+                                Text("Reply")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 2)
                 }
                 
-                if let content = message.content {
-                    Text(content)
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.9))
+                Spacer()
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.02))
+        )
+    }
+    
+    private func messageRowView(message: GroupMessage) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                // Avatar
+                Circle()
+                    .fill(accentColor.opacity(0.2))
+                    .frame(width: 36, height: 36)
+                    .overlay(
+                        Text(String(message.username.prefix(1).uppercased()))
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                    )
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    // Header
+                    HStack(spacing: 8) {
+                        Text(message.username)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        Text(message.createdAt, style: .time)
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                        
+                        Spacer()
+                    }
+                    
+                    // Reply indicator if this is a reply
+                    if message.replyToId != nil {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrowshape.turn.up.left.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(.gray)
+                            
+                            Text("Reply")
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.bottom, 2)
+                    }
+                    
+                    // Message content
+                    if let content = message.content, !content.isEmpty {
+                        Text(content)
+                            .font(.system(size: 15))
+                            .foregroundColor(.white.opacity(0.9))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    
+                    // Location content if present
+                    if let locationTitle = message.locationTitle {
+                        locationMessageView(title: locationTitle, latitude: message.locationLatitude, longitude: message.locationLongitude)
+                    }
+                    
+                    // Action buttons
+                    HStack(spacing: 16) {
+                        // Like button
+                        Button(action: {
+                            likeMessage(message)
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "heart.fill") // In real app, this would be conditional
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.red.opacity(0.7))
+                                
+                                Text("0") // In real app, this would show actual like count
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Reply button
+                        Button(action: {
+                            replyToMessage(message)
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrowshape.turn.up.left")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                                
+                                Text("Reply")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 4)
+                }
+                
+                Spacer()
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.03))
+        )
+    }
+    
+    private func locationMessageView(title: String, latitude: Double?, longitude: Double?) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "location.fill")
+                .font(.system(size: 16))
+                .foregroundColor(accentColor)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                
+                if let lat = latitude, let lng = longitude {
+                    Text("\(lat, specifier: "%.4f"), \(lng, specifier: "%.4f")")
+                        .font(.system(size: 12))
+                        .foregroundColor(.gray)
                 }
             }
             
             Spacer()
+            
+            Button(action: {
+                // Open location on map
+            }) {
+                Image(systemName: "arrow.up.right.square")
+                    .font(.system(size: 14))
+                    .foregroundColor(accentColor)
+            }
         }
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white.opacity(0.03))
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(accentColor.opacity(0.3), lineWidth: 1)
+                )
         )
+    }
+    
+    private func likeMessage(_ message: GroupMessage) {
+        if let firstGroup = dataManager.userGroups.first {
+            dataManager.likeGroupMessage(firstGroup.id, messageId: message.id)
+        }
+    }
+    
+    private func replyToMessage(_ message: GroupMessage) {
+        // Set the reply state - this will be passed to ChatInputView
+        replyingToMessage = message
     }
     
     private func locationsTabView(for group: Group) -> some View {
@@ -768,7 +1057,11 @@ struct GroupsView: View {
     }
     
     private var createGroupButton: some View {
-        Button(action: { showingCreateGroup = true }) {
+        Button(action: { 
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+            showingCreateGroup = true 
+        }) {
             HStack(spacing: 12) {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 18))
@@ -783,6 +1076,9 @@ struct GroupsView: View {
             .cornerRadius(16)
             .shadow(color: accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
         }
+        .scaleEffect(isViewVisible ? 1 : 0.8)
+        .opacity(isViewVisible ? 1 : 0)
+        .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.4), value: isViewVisible)
     }
     
     private var createGroupButtonBackground: some View {
@@ -794,7 +1090,11 @@ struct GroupsView: View {
     }
     
     private var joinGroupButton: some View {
-        Button(action: { showingJoinGroup = true }) {
+        Button(action: { 
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+            showingJoinGroup = true 
+        }) {
             HStack(spacing: 12) {
                 Image(systemName: "person.badge.plus")
                     .font(.system(size: 18))
@@ -812,6 +1112,9 @@ struct GroupsView: View {
                     .stroke(Color.white.opacity(0.2), lineWidth: 1)
             )
         }
+        .scaleEffect(isViewVisible ? 1 : 0.8)
+        .opacity(isViewVisible ? 1 : 0)
+        .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5), value: isViewVisible)
     }
     
     // MARK: - Helper Functions
@@ -843,6 +1146,196 @@ struct GroupsView: View {
         } else {
             return "\(minutes)m"
         }
+    }
+    
+    // MARK: - Keyboard Handling
+    
+    private func setupKeyboardObservers() {
+        // Observe keyboard will show
+        NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
+            .compactMap { notification in
+                (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue.height
+            }
+            .receive(on: DispatchQueue.main)
+            .sink { height in
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8, blendDuration: 0)) {
+                    keyboardHeight = height
+                }
+                // Add subtle haptic feedback when keyboard appears
+                let impactFeedback = UIImpactFeedbackGenerator(style: .soft)
+                impactFeedback.impactOccurred()
+            }
+            .store(in: &cancellables)
+        
+        // Observe keyboard will hide
+        NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { _ in
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.9, blendDuration: 0)) {
+                    keyboardHeight = 0
+                }
+                // Add subtle haptic feedback when keyboard disappears
+                let impactFeedback = UIImpactFeedbackGenerator(style: .soft)
+                impactFeedback.impactOccurred()
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}
+
+// MARK: - Chat Input View
+
+struct ChatInputView: View {
+    let groupId: Int
+    @Binding var replyingTo: GroupMessage?
+    @EnvironmentObject var dataManager: DataManager
+    @State private var messageText = ""
+    @FocusState private var isTextFieldFocused: Bool
+    @State private var hasAppeared = false
+    
+    let accentColor = Color(hex: "#7289da")
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Reply indicator
+            if let replyMessage = replyingTo {
+                replyIndicatorView(message: replyMessage)
+            }
+            
+            // Input area with better visibility - tap anywhere to focus
+            HStack(spacing: 12) {
+                // Text input with enhanced visibility
+                HStack(spacing: 8) {
+                    TextField("Tap here to type a message...", text: $messageText, axis: .vertical)
+                        .focused($isTextFieldFocused)
+                        .font(.system(size: 16))
+                        .foregroundColor(.white)
+                        .lineLimit(1...4)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.white.opacity(0.15))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(isTextFieldFocused ? accentColor : Color.white.opacity(0.3), lineWidth: 2)
+                                )
+                        )
+                        .onSubmit {
+                            sendMessage()
+                        }
+                    
+                    // Attachment button
+                    Button(action: {
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+                        // TODO: Open attachment options
+                    }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundColor(accentColor)
+                            .scaleEffect(1.0)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: messageText)
+                    }
+                }
+                .onTapGesture {
+                    // Make entire input area tappable to focus
+                    isTextFieldFocused = true
+                }
+                
+                // Send button with better visibility and animations
+                Button(action: {
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                    sendMessage()
+                }) {
+                    Image(systemName: messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "arrow.up.circle" : "arrow.up.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundColor(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .gray : accentColor)
+                        .scaleEffect(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 1.0 : 1.1)
+                        .rotationEffect(.degrees(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0 : 360))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.7), value: messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .opacity(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.6 : 1.0)
+                .animation(.easeInOut(duration: 0.2), value: messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .background(
+                Rectangle()
+                    .fill(Color.black)
+                    .overlay(
+                        Rectangle()
+                            .fill(Color.white.opacity(0.05))
+                    )
+            )
+        }
+        .onAppear {
+            // Remove auto-focus, let user tap to focus
+            hasAppeared = true
+        }
+    }
+    
+    private func replyIndicatorView(message: GroupMessage) -> some View {
+        HStack(spacing: 12) {
+            Rectangle()
+                .fill(accentColor)
+                .frame(width: 3)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Replying to \(message.username)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(accentColor)
+                
+                if let content = message.content {
+                    Text(content)
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray)
+                        .lineLimit(2)
+                }
+            }
+            
+            Spacer()
+            
+            Button(action: {
+                replyingTo = nil
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.05))
+    }
+    
+    private func sendMessage() {
+        let trimmedMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedMessage.isEmpty else { return }
+        
+        let replyToId = replyingTo?.id
+        
+        // Send the message
+        dataManager.sendGroupMessage(
+            groupId,
+            content: trimmedMessage,
+            messageType: .text,
+            locationId: nil,
+            replyToId: replyToId
+        )
+        
+        // Clear input and reply state
+        messageText = ""
+        replyingTo = nil
+        
+        // Add haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
     }
 }
 

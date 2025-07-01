@@ -631,4 +631,87 @@ router.post('/:id/activity', authenticateToken, async (req, res) => {
     }
 });
 
+// Like/unlike a message
+router.post('/:groupId/messages/:messageId/like', authenticateToken, async (req, res) => {
+    const groupId = parseInt(req.params.groupId);
+    const messageId = parseInt(req.params.messageId);
+    const userId = req.user.userId;
+    
+    try {
+        const connection = await pool.getConnection();
+        
+        try {
+            await connection.beginTransaction();
+            
+            // Check if user is a member of the group
+            const [memberCheck] = await connection.execute(
+                'SELECT id FROM group_members WHERE group_id = ? AND user_id = ?',
+                [groupId, userId]
+            );
+            
+            if (memberCheck.length === 0) {
+                await connection.rollback();
+                return res.status(403).json({ error: 'Not a member of this group' });
+            }
+            
+            // Check if message exists and belongs to the group
+            const [messageCheck] = await connection.execute(
+                'SELECT id FROM group_messages WHERE id = ? AND group_id = ?',
+                [messageId, groupId]
+            );
+            
+            if (messageCheck.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ error: 'Message not found' });
+            }
+            
+            // Check if user already liked this message
+            const [existingLike] = await connection.execute(
+                'SELECT id FROM group_message_likes WHERE message_id = ? AND user_id = ?',
+                [messageId, userId]
+            );
+            
+            let isLiked;
+            if (existingLike.length > 0) {
+                // Unlike the message
+                await connection.execute(
+                    'DELETE FROM group_message_likes WHERE message_id = ? AND user_id = ?',
+                    [messageId, userId]
+                );
+                isLiked = false;
+            } else {
+                // Like the message
+                await connection.execute(
+                    'INSERT INTO group_message_likes (message_id, user_id, created_at) VALUES (?, ?, NOW())',
+                    [messageId, userId]
+                );
+                isLiked = true;
+            }
+            
+            // Get updated like count
+            const [likeCount] = await connection.execute(
+                'SELECT COUNT(*) as count FROM group_message_likes WHERE message_id = ?',
+                [messageId]
+            );
+            
+            await connection.commit();
+            
+            res.json({ 
+                success: true, 
+                isLiked: isLiked,
+                likeCount: likeCount[0].count
+            });
+            
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    } catch (error) {
+        console.error('Error liking message:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 module.exports = router; 
