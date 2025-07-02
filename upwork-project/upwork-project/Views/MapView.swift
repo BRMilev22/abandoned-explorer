@@ -412,6 +412,9 @@ struct MapView: View {
                 // Force geocoding when user location first becomes available
                 geocodingService.forceInitialGeocode(coordinate: location, zoomLevel: currentZoomLevel)
                 
+                // Auto-detect and update user region if unknown
+                dataManager.checkAndUpdateUserRegion(location: location)
+                
                 // Load data based on current zoom level for optimal performance
                 print("📍 First user location available - loading data for zoom level \(currentZoomLevel)")
                 // Use smart zoom-based loading to avoid validation errors
@@ -439,6 +442,8 @@ struct MapView: View {
                     if let userLoc = locationManager.userLocation {
                         currentMapCenter = userLoc
                         geocodingService.forceInitialGeocode(coordinate: userLoc, zoomLevel: currentZoomLevel)
+                        // Auto-detect and update user region if unknown
+                        dataManager.checkAndUpdateUserRegion(location: userLoc)
                         // Update user's location in the backend
                         dataManager.updateUserLocation(latitude: userLoc.latitude, longitude: userLoc.longitude)
                         // Load active users for newly authorized location
@@ -712,7 +717,9 @@ struct MapView: View {
     }
     
     private func updateLocationAndLoad() {
-        if locationManager.userLocation != nil {
+        if let userLocation = locationManager.userLocation {
+            // Check and update region every time location updates
+            dataManager.checkAndUpdateUserRegion(location: userLocation)
             loadNearbyLocations()
         }
     }
@@ -1952,24 +1959,8 @@ struct ZoomAwareBottomBanner: View {
                     
                     Spacer()
                     
-                    // Groups button (Snapchat-style)
-                    Button(action: {
-                        onGroupsPressed()
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.3.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.white)
-                            
-                            Text("Groups")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color(hex: "#7289da"))
-                        .cornerRadius(20)
-                    }
+                    // Groups button with animated outline
+                    AnimatedGroupsButton(action: onGroupsPressed)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)

@@ -140,6 +140,125 @@ INSERT INTO `danger_levels` (`id`, `name`, `color`, `description`, `risk_level`,
 	(2, 'Caution', 'yellow', 'Requires caution and proper safety equipment', 2, '2025-06-22 23:44:43'),
 	(3, 'Dangerous', 'red', 'High risk - experienced explorers only', 3, '2025-06-22 23:44:43');
 
+-- Dumping structure for table abandoned_explorer.groups
+CREATE TABLE IF NOT EXISTS `groups` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) DEFAULT NULL,
+  `name` varchar(100) NOT NULL,
+  `description` text DEFAULT NULL,
+  `invite_code` varchar(8) NOT NULL,
+  `created_by` int(11) NOT NULL,
+  `is_private` tinyint(1) DEFAULT 0,
+  `member_limit` int(11) DEFAULT 50,
+  `avatar_color` varchar(7) DEFAULT '#7289da',
+  `emoji` varchar(10) DEFAULT '🏚️',
+  `region` varchar(50) DEFAULT 'Unknown',
+  `points` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `invite_code` (`invite_code`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_uuid` (`uuid`),
+  KEY `idx_invite_code` (`invite_code`),
+  KEY `idx_created_by` (`created_by`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_region` (`region`),
+  CONSTRAINT `groups_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for table abandoned_explorer.groups: ~1 rows (approximately)
+INSERT INTO `groups` (`id`, `uuid`, `name`, `description`, `invite_code`, `created_by`, `is_private`, `member_limit`, `avatar_color`, `emoji`, `region`, `points`, `created_at`, `updated_at`) VALUES
+	(3, '8644adf7-ce70-4e97-a31e-fb921b1ccf76', 'Test group 1', NULL, '4KGZKVDQ', 1, 1, 4, '#7289da', '☀️', 'EU', 150, '2025-06-30 11:44:29', '2025-06-30 11:44:29');
+
+-- Dumping structure for table abandoned_explorer.group_locations
+CREATE TABLE IF NOT EXISTS `group_locations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) DEFAULT NULL,
+  `group_id` int(11) NOT NULL,
+  `location_id` int(11) NOT NULL,
+  `shared_by` int(11) NOT NULL,
+  `notes` text DEFAULT NULL,
+  `is_pinned` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_group_location` (`group_id`,`location_id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_uuid` (`uuid`),
+  KEY `idx_group_locations` (`group_id`,`created_at`),
+  KEY `idx_location_groups` (`location_id`),
+  KEY `idx_shared_by` (`shared_by`),
+  KEY `idx_pinned` (`group_id`,`is_pinned`),
+  CONSTRAINT `group_locations_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_locations_ibfk_2` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_locations_ibfk_3` FOREIGN KEY (`shared_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for table abandoned_explorer.group_locations: ~0 rows (approximately)
+
+-- Dumping structure for table abandoned_explorer.group_members
+CREATE TABLE IF NOT EXISTS `group_members` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) DEFAULT NULL,
+  `group_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `role` enum('owner','admin','member') DEFAULT 'member',
+  `nickname` varchar(50) DEFAULT NULL,
+  `joined_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `last_active_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_group_member` (`group_id`,`user_id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_uuid` (`uuid`),
+  KEY `idx_group_members` (`group_id`,`joined_at`),
+  KEY `idx_user_groups` (`user_id`,`joined_at`),
+  KEY `idx_role` (`role`),
+  CONSTRAINT `group_members_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_members_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for table abandoned_explorer.group_members: ~1 rows (approximately)
+INSERT INTO `group_members` (`id`, `uuid`, `group_id`, `user_id`, `role`, `nickname`, `joined_at`, `last_active_at`) VALUES
+	(3, '176c1ec3-027c-4288-b3da-605d4d5af594', 3, 1, 'owner', NULL, '2025-06-30 11:44:29', '2025-06-30 23:01:59'),
+	(5, '6c589649-0274-4104-b3d3-177e57b809ba', 3, 2, 'member', NULL, '2025-07-01 05:23:38', '2025-07-01 05:30:23');
+
+-- Dumping structure for table abandoned_explorer.group_messages
+CREATE TABLE IF NOT EXISTS `group_messages` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) DEFAULT NULL,
+  `group_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `message_type` enum('text','location','image','system') DEFAULT 'text',
+  `content` text DEFAULT NULL,
+  `location_id` int(11) DEFAULT NULL,
+  `image_url` varchar(500) DEFAULT NULL,
+  `reply_to_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_uuid` (`uuid`),
+  KEY `idx_group_messages` (`group_id`,`created_at`),
+  KEY `idx_user_messages` (`user_id`,`created_at`),
+  KEY `idx_location_id` (`location_id`),
+  KEY `idx_reply_to` (`reply_to_id`),
+  CONSTRAINT `group_messages_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_messages_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_messages_ibfk_3` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `group_messages_ibfk_4` FOREIGN KEY (`reply_to_id`) REFERENCES `group_messages` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for table abandoned_explorer.group_messages: ~2 rows (approximately)
+INSERT INTO `group_messages` (`id`, `uuid`, `group_id`, `user_id`, `message_type`, `content`, `location_id`, `image_url`, `reply_to_id`, `created_at`, `updated_at`, `deleted_at`) VALUES
+	(1, 'b2ce3590-01ac-4f31-85b5-4e62b757f8e8', 3, 1, 'text', 'Hello', NULL, NULL, NULL, '2025-06-30 21:24:34', '2025-06-30 21:24:34', NULL),
+	(2, 'a179ec3d-8d6a-41b7-9ceb-36d1d8049959', 3, 1, 'text', 'Test', NULL, NULL, NULL, '2025-06-30 22:53:56', '2025-06-30 22:53:56', NULL),
+	(3, '118921b0-4de3-4f19-8373-a63944b6c8f4', 3, 1, 'text', 'Fixing', NULL, NULL, NULL, '2025-06-30 23:01:51', '2025-06-30 23:01:51', NULL),
+	(4, 'f52a9b9f-06ad-47eb-aaf6-43252d771da6', 3, 1, 'text', 'Test', NULL, NULL, 3, '2025-06-30 23:01:59', '2025-06-30 23:01:59', NULL),
+	(5, '10a9f5dd-0861-42c7-a5bb-65506911f69d', 3, 2, 'system', 'joined the group', NULL, NULL, NULL, '2025-06-30 23:02:55', '2025-06-30 23:02:55', NULL),
+	(6, '61ff06cb-c8a0-4ada-b05f-33bf86cc69ab', 3, 2, 'system', 'left the group', NULL, NULL, NULL, '2025-07-01 05:22:46', '2025-07-01 05:22:46', NULL),
+	(7, '864d5d27-2664-4f62-9698-4e8b5e00c168', 3, 2, 'system', 'joined the group', NULL, NULL, NULL, '2025-07-01 05:23:38', '2025-07-01 05:23:38', NULL);
+
 -- Dumping structure for table abandoned_explorer.likes
 CREATE TABLE IF NOT EXISTS `likes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -212,7 +331,7 @@ INSERT INTO `locations` (`id`, `uuid`, `title`, `description`, `latitude`, `long
 	(1, NULL, 'Abandoned Hospital', 'Description test', 37.78583400, -122.40641700, 'Lat: 37.785834, Lng: -122.406417', 1, 3, 1, 1, '2025-06-23 00:24:56', 1, 0, 970, 35, 36, 0, '2025-06-23 00:03:11', '2025-06-29 21:02:43', NULL),
 	(2, NULL, 'Test 2', 'Test 2', 37.78583400, -122.40641700, 'Lat: 37.785834, Lng: -122.406417', 8, 2, 2, 1, '2025-06-23 01:36:42', 2, 0, 530, 79, 8, 0, '2025-06-23 01:25:15', '2025-06-29 23:45:54', NULL),
 	(3, NULL, 'Test 3', 'Test 3', 37.78583400, -122.40641700, 'Lat: 37.785834, Lng: -122.406417', 4, 1, 1, 1, '2025-06-23 02:59:54', 2, 0, 688, 87, 33, 0, '2025-06-23 02:59:22', '2025-06-29 16:20:07', NULL),
-	(4, NULL, 'Test', 'Teary', 42.34309088, 27.18902228, 'Lat: 42.343091, Lng: 27.189022', 4, 3, 1, 1, '2025-06-24 00:44:30', 2, 0, 813, 1, 1, 4, '2025-06-24 00:36:21', '2025-06-29 23:45:57', NULL),
+	(4, NULL, 'Test', 'Teary', 42.34309088, 27.18902228, 'Lat: 42.343091, Lng: 27.189022', 4, 3, 1, 1, '2025-06-24 00:44:30', 2, 0, 815, 1, 1, 4, '2025-06-24 00:36:21', '2025-06-30 23:03:10', NULL),
 	(5, '3437302c-50a5-11f0-a415-36cb2806145a', 'Abandoned Hospital NYC', 'Old Bellevue psychiatric ward, creepy but fascinating', 40.73860000, -73.98570000, 'Manhattan, NY', 1, 2, 1, 1, '2025-06-24 02:44:52', NULL, 0, 863, 109, 2, 0, '2025-06-24 02:44:52', '2025-06-24 02:44:52', NULL),
 	(6, '34381eb0-50a5-11f0-a415-36cb2806145a', 'Defunct Factory Manhattan', 'Industrial complex from the 1920s', 40.75050000, -73.99340000, 'Manhattan, NY', 2, 2, 1, 1, '2025-06-24 02:44:52', NULL, 0, 885, 155, 90, 0, '2025-06-24 02:44:52', '2025-06-24 02:44:52', NULL),
 	(7, '343854ac-50a5-11f0-a415-36cb2806145a', 'Old School Building', 'Abandoned elementary school with intact classrooms', 40.72820000, -73.99420000, 'Manhattan, NY', 3, 1, 1, 1, '2025-06-24 02:44:52', NULL, 0, 787, 43, 42, 0, '2025-06-24 02:44:52', '2025-06-27 09:49:54', NULL),
@@ -258,18 +377,18 @@ INSERT INTO `locations` (`id`, `uuid`, `title`, `description`, `latitude`, `long
 	(47, NULL, 'Guy ggdhdhdhdhdhdhdhddudjdjdhdhdhdiaja uaidwbsiqxq', 'Guy ggdhdhdhdhdhdhdhddudjdjdhdhdhdiaja uaidwbsiqxqixvqbxuqbxquxbqixbwxiqbxiwbxwixbwixbwxibwixbwixbwixbwxihwxiwxiwbxwjbxwjxbwkxbwkxbwjxbwibxwixbwixvwjxbwjbxwjbx', 42.34310148, 27.18901287, 'Current Location', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-28 11:56:45', '2025-06-28 11:56:45', NULL),
 	(48, NULL, 'Guy ggdhdhdhdhdhdhdhddudjdjdhdhdhdiaja uaidwbsiqxq', 'Guy ggdhdhdhdhdhdhdhddudjdjdhdhdhdiaja uaidwbsiqxqixvqbxuqbxquxbqixbwxiqbxiwbxwixbwixbwxibwixbwixbwixbwxihwxiwxiwbxwjbxwjxbwkxbwkxbwjxbwibxwixbwixvwjxbwjbxwjbx', 42.34310148, 27.18901287, 'Current Location', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-28 11:56:45', '2025-06-28 11:56:45', NULL),
 	(49, NULL, 'Llbym dumfbdbykdvyevydvtksvyksvtjwtjevtkdvyfkysymv', 'Llbym dumfbdbykdvyevydvtksvyksvtjwtjevtkdvyfkysymvsyksbsdbykebydlbydlbckhxhlxlhlxlhclhlhcjvqktdvkydvykevykrukrurk ur ult url urlurrnulr irl ult url urlunru', 42.34495056, 27.18363819, 'Lat: 42.34495055748974, Lng: 27.18363819343972', 1, 2, 2, 1, '2025-06-28 12:44:16', 2, 0, 3, 0, 0, 0, '2025-06-28 12:43:53', '2025-06-29 13:34:15', NULL),
-	(52, NULL, 'Test location', 'Itcitgicigcihiggcgcigcigchchcjsvdgdhdudhdhdivjvohcohcohhchocohcohcohcohcohcohcohvohcohcohco heihcohcoh oh oh oh oh oh chichi you hchchchchchchchchchchc h', 42.34718814, 27.17621524, 'Lat: 42.34718813625099, Lng: 27.176215236569618', 6, 2, 2, 1, '2025-06-28 13:07:51', 2, 0, 2, 0, 0, 0, '2025-06-28 13:07:39', '2025-06-29 13:24:08', NULL),
+	(52, NULL, 'Test location', 'Itcitgicigcihiggcgcigcigchchcjsvdgdhdudhdhdivjvohcohcohhchocohcohcohcohcohcohcohvohcohcohco heihcohcoh oh oh oh oh oh chichi you hchchchchchchchchchchc h', 42.34718814, 27.17621524, 'Lat: 42.34718813625099, Lng: 27.176215236569618', 6, 2, 2, 1, '2025-06-28 13:07:51', 2, 0, 3, 0, 0, 0, '2025-06-28 13:07:39', '2025-06-30 11:31:07', NULL),
 	(53, NULL, 'Test loc', 'Test dead\n\nExplored on: 28 Jun 2025\nTime of day: usk\nCompanions: 3 (Test )', 42.34197316, 27.19180132, 'Lat: 42.34197316003562, Lng: 27.191801316031643', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-29 09:46:18', '2025-06-29 09:46:18', NULL),
 	(54, NULL, 'Test loc', 'Test dead\n\nExplored on: 28 Jun 2025\nTime of day: usk\nCompanions: 3 (Test )', 42.34197316, 27.19180132, 'Lat: 42.34197316003562, Lng: 27.191801316031643', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-29 09:46:18', '2025-06-29 09:46:18', NULL),
 	(55, NULL, 'Test loc', 'Test dead\n\nExplored on: 28 Jun 2025\nTime of day: usk\nCompanions: 3 (Test )', 42.34197316, 27.19180132, 'Lat: 42.34197316003562, Lng: 27.191801316031643', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-29 09:46:18', '2025-06-29 09:46:18', NULL),
 	(56, NULL, 'Test loc', 'Test dead\n\nExplored on: 28 Jun 2025\nTime of day: usk\nCompanions: 3 (Test )', 42.34197316, 27.19180132, 'Lat: 42.34197316003562, Lng: 27.191801316031643', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-29 09:46:19', '2025-06-29 09:46:19', NULL),
 	(57, NULL, 'Murkier folkways', 'Explored on: 29 Jun 2025\nTime of day: ay\nExplored solo', 42.33633445, 27.18692345, 'Lat: 42.33633444808501, Lng: 27.18692345326727', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-29 11:47:44', '2025-06-29 11:47:44', NULL),
 	(58, NULL, 'Mitkooooo', 'Explored on: 30 Jun 2025\nTime of day: usk\nExplored solo', 42.33866878, 27.17469027, 'Lat: 42.338668778452586, Lng: 27.174690272925858', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-29 11:51:56', '2025-06-29 11:51:56', NULL),
-	(59, NULL, 'Test mitko', 'Explored on: 29 Jun 2025\nTime of day: ay\nExplored solo', 42.33832236, 27.17610871, 'Lat: 42.33832235566797, Lng: 27.176108707261818', 1, 2, 2, 1, '2025-06-29 13:24:01', 2, 0, 4, 0, 0, 0, '2025-06-29 12:07:17', '2025-06-29 21:39:25', NULL),
+	(59, NULL, 'Test mitko', 'Explored on: 29 Jun 2025\nTime of day: ay\nExplored solo', 42.33832236, 27.17610871, 'Lat: 42.33832235566797, Lng: 27.176108707261818', 1, 2, 2, 1, '2025-06-29 13:24:01', 2, 0, 5, 0, 0, 0, '2025-06-29 12:07:17', '2025-06-30 11:30:59', NULL),
 	(60, NULL, 'Test video', 'Explored on: 30 Jun 2025\nTime of day: ay\nExplored solo', 42.36139296, 27.22001771, 'Lat: 42.36139295944841, Lng: 27.2200177130307', 1, 2, 2, 1, '2025-06-29 15:54:44', 2, 0, 2, 0, 0, 0, '2025-06-29 15:50:39', '2025-06-29 16:03:19', NULL),
-	(61, NULL, 'Test video plus picture', 'Explored on: 30 Jun 2025\nTime of day: Dusk\nExplored solo', 42.35824033, 27.17673936, 'Lat: 42.35824033095966, Lng: 27.176739360146655', 1, 2, 2, 1, '2025-06-29 16:05:55', 2, 0, 1, 0, 0, 0, '2025-06-29 16:04:29', '2025-06-29 16:09:49', NULL),
+	(61, NULL, 'Test video plus picture', 'Explored on: 30 Jun 2025\nTime of day: Dusk\nExplored solo', 42.35824033, 27.17673936, 'Lat: 42.35824033095966, Lng: 27.176739360146655', 1, 2, 2, 1, '2025-06-29 16:05:55', 2, 0, 2, 0, 0, 0, '2025-06-29 16:04:29', '2025-06-30 11:31:11', NULL),
 	(62, NULL, 'Test location danger level', 'Explored on: 29 Jun 2025\nTime of day: Night\nExplored solo', 42.35270209, 27.19636443, 'Lat: 42.352702088914185, Lng: 27.19636442890547', 1, 3, 2, 1, '2025-06-29 16:11:49', 2, 0, 1, 0, 0, 0, '2025-06-29 16:11:09', '2025-06-29 16:12:25', NULL),
-	(63, NULL, 'Test test', 'Test test\n\nExplored on: 15 Jul 2025\nTime of day: Day\nExplored solo', 37.79415465, -122.39295137, 'Lat: 37.7941546505662, Lng: -122.39295136747454', 1, 1, 2, 1, '2025-06-29 16:31:35', 2, 0, 0, 0, 0, 0, '2025-06-29 16:31:05', '2025-06-29 16:31:35', NULL),
+	(63, NULL, 'Test test', 'Test test\n\nExplored on: 15 Jul 2025\nTime of day: Day\nExplored solo', 37.79415465, -122.39295137, 'Lat: 37.7941546505662, Lng: -122.39295136747454', 1, 1, 2, 1, '2025-06-29 16:31:35', 2, 0, 1, 0, 0, 0, '2025-06-29 16:31:05', '2025-07-01 05:26:59', NULL),
 	(64, NULL, 'Ppppp', 'Explored on: 30 Jun 2025\nTime of day: Day\nExplored solo', 42.32973608, 27.20231546, 'Lat: 42.32973607633579, Lng: 27.20231545658629', 1, 2, 1, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-29 21:40:08', '2025-06-29 21:40:08', NULL);
 
 -- Dumping structure for table abandoned_explorer.location_categories
@@ -451,7 +570,7 @@ CREATE TABLE IF NOT EXISTS `location_visits` (
   KEY `idx_user_visits` (`user_id`,`visited_at`),
   CONSTRAINT `location_visits_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
   CONSTRAINT `location_visits_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=64 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Dumping data for table abandoned_explorer.location_visits: ~63 rows (approximately)
 INSERT INTO `location_visits` (`id`, `uuid`, `location_id`, `user_id`, `ip_address`, `user_agent`, `visited_at`) VALUES
@@ -517,7 +636,13 @@ INSERT INTO `location_visits` (`id`, `uuid`, `location_id`, `user_id`, `ip_addre
 	(60, NULL, 46, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-29 23:09:11'),
 	(61, NULL, 46, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-29 23:42:46'),
 	(62, NULL, 2, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-29 23:45:54'),
-	(63, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-29 23:45:57');
+	(63, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-29 23:45:57'),
+	(64, NULL, 59, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-30 11:30:59'),
+	(65, NULL, 52, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-30 11:31:07'),
+	(66, NULL, 61, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-30 11:31:11'),
+	(67, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-30 11:33:16'),
+	(68, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-30 23:03:10'),
+	(69, NULL, 63, NULL, '::ffff:192.168.0.116', 'upwork-project/1 CFNetwork/3826.500.131 Darwin/25.0.0', '2025-07-01 05:26:59');
 
 -- Dumping structure for table abandoned_explorer.notifications
 CREATE TABLE IF NOT EXISTS `notifications` (
@@ -547,11 +672,11 @@ CREATE TABLE IF NOT EXISTS `notifications` (
 
 -- Dumping data for table abandoned_explorer.notifications: ~7 rows (approximately)
 INSERT INTO `notifications` (`id`, `uuid`, `user_id`, `title`, `message`, `type`, `related_type`, `related_id`, `triggered_by`, `data`, `is_read`, `created_at`) VALUES
-	(1, NULL, 1, 'New Comment', 'admin commented on your location', 'comment', 'location', 4, NULL, NULL, 0, '2025-06-27 11:41:05'),
+	(1, NULL, 1, 'New Comment', 'admin commented on your location', 'comment', 'location', 4, NULL, NULL, 1, '2025-06-27 11:41:05'),
 	(2, NULL, 1, 'New Comment', 'admin commented on your location', 'comment', 'location', 4, NULL, NULL, 1, '2025-06-27 12:31:52'),
 	(3, NULL, 1, 'New Comment', 'admin commented on your location', 'comment', 'location', 4, NULL, NULL, 0, '2025-06-27 12:57:45'),
 	(4, NULL, 1, 'New Comment', 'admin commented on your location', 'comment', 'location', 4, NULL, NULL, 0, '2025-06-27 12:59:51'),
-	(5, NULL, 1, 'Location Submitted', 'Your location "Ppppp" has been submitted for review', 'submission', 'location', 64, NULL, '{"locationTitle":"Ppppp","status":"pending_approval"}', 0, '2025-06-29 21:40:08'),
+	(5, NULL, 1, 'Location Submitted', 'Your location "Ppppp" has been submitted for review', 'submission', 'location', 64, NULL, '{"locationTitle":"Ppppp","status":"pending_approval"}', 1, '2025-06-29 21:40:08'),
 	(6, NULL, 2, 'New Comment', 'test commented on your location "Stefan"', 'comment', 'location', 46, 1, '{"locationTitle":"Stefan","commenterUsername":"test","commentText":"Test"}', 1, '2025-06-29 21:40:42'),
 	(7, NULL, 2, 'New Reply', 'test replied to your comment', 'reply', 'comment', 1, 1, '{"locationTitle":"Stefan","commenterUsername":"test","replyText":"Test"}', 1, '2025-06-29 21:40:42');
 
@@ -594,7 +719,7 @@ CREATE TABLE IF NOT EXISTS `tags` (
   KEY `idx_usage_count` (`usage_count`)
 ) ENGINE=InnoDB AUTO_INCREMENT=49 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dumping data for table abandoned_explorer.tags: ~21 rows (approximately)
+-- Dumping data for table abandoned_explorer.tags: ~22 rows (approximately)
 INSERT INTO `tags` (`id`, `name`, `usage_count`, `created_at`) VALUES
 	(1, 'creepy', 0, '2025-06-25 15:41:16'),
 	(2, 'zavedenie', 0, '2025-06-25 15:41:16'),
@@ -652,8 +777,8 @@ CREATE TABLE IF NOT EXISTS `users` (
 
 -- Dumping data for table abandoned_explorer.users: ~142 rows (approximately)
 INSERT INTO `users` (`id`, `uuid`, `username`, `email`, `password_hash`, `age`, `is_premium`, `profile_image_url`, `created_at`, `updated_at`, `last_login`, `is_active`, `email_verified`, `phone_number`, `bio`) VALUES
-	(1, NULL, 'test', 'test@test.com', '$2a$12$v5CguxvZGnoz3/rd18WWWu1QvgUkfgjczZk7ah8FxbZJZgs1XmOwG', 18, 0, NULL, '2025-06-22 23:49:51', '2025-06-29 23:46:25', '2025-06-29 23:46:25', 1, 0, NULL, NULL),
-	(2, NULL, 'admin', 'admin@admin.com', '$2a$12$v5gBvVxl6dlJkqmtLaxXSO6KdZGuSbn9iwATEh2js7caXpbphKNx.', 18, 0, NULL, '2025-06-23 01:10:05', '2025-06-29 23:46:04', '2025-06-29 23:46:04', 1, 0, NULL, NULL),
+	(1, NULL, 'test', 'test@test.com', '$2a$12$v5CguxvZGnoz3/rd18WWWu1QvgUkfgjczZk7ah8FxbZJZgs1XmOwG', 18, 0, NULL, '2025-06-22 23:49:51', '2025-06-30 23:01:34', '2025-06-30 23:01:34', 1, 0, NULL, NULL),
+	(2, NULL, 'admin', 'admin@admin.com', '$2a$12$v5gBvVxl6dlJkqmtLaxXSO6KdZGuSbn9iwATEh2js7caXpbphKNx.', 18, 0, NULL, '2025-06-23 01:10:05', '2025-07-01 05:31:47', '2025-07-01 05:31:47', 1, 0, NULL, NULL),
 	(18, NULL, 'alex_nyc', 'alex@example.com', '$2b$10$hash1', NULL, 1, 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 12:22:22', 1, 0, NULL, NULL),
 	(19, NULL, 'maria_london', 'maria@example.com', '$2b$10$hash2', NULL, 0, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100', '2025-06-24 11:56:40', '2025-06-25 12:20:22', '2025-06-25 12:20:22', 1, 0, NULL, NULL),
 	(20, NULL, 'tom_paris', 'tom@example.com', '$2b$10$hash3', NULL, 1, 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', '2025-06-24 11:56:40', '2025-06-25 12:18:22', '2025-06-25 12:18:22', 1, 0, NULL, NULL),
@@ -811,12 +936,12 @@ CREATE TABLE IF NOT EXISTS `user_locations` (
   KEY `idx_coordinates` (`latitude`,`longitude`),
   KEY `idx_updated_at` (`updated_at`),
   CONSTRAINT `user_locations_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=491 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=563 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dumping data for table abandoned_explorer.user_locations: ~91 rows (approximately)
+-- Dumping data for table abandoned_explorer.user_locations: ~94 rows (approximately)
 INSERT INTO `user_locations` (`id`, `user_id`, `latitude`, `longitude`, `accuracy_meters`, `location_name`, `updated_at`, `created_at`) VALUES
-	(1, 2, 42.34310229, 27.18901199, 1000, NULL, '2025-06-29 23:46:04', '2025-06-24 10:16:44'),
-	(2, 1, 42.34310238, 27.18901202, 1000, NULL, '2025-06-29 23:46:25', '2025-06-24 10:16:44'),
+	(1, 2, 37.78583400, -122.40641700, 1000, NULL, '2025-07-01 05:31:47', '2025-06-24 10:16:44'),
+	(2, 1, 42.34310377, 27.18901279, 1000, NULL, '2025-06-30 23:01:34', '2025-06-24 10:16:44'),
 	(32, 18, 40.71280000, -74.00600000, 50, 'New York, NY, USA', '2025-06-24 12:20:22', '2025-06-24 12:22:22'),
 	(33, 19, 51.50740000, -0.12780000, 30, 'London, UK', '2025-06-24 12:21:22', '2025-06-24 12:22:22'),
 	(34, 20, 48.85660000, 2.35220000, 40, 'Paris, France', '2025-06-24 12:19:22', '2025-06-24 12:22:22'),
@@ -947,117 +1072,17 @@ CREATE TABLE IF NOT EXISTS `user_sessions` (
 
 -- Dumping data for table abandoned_explorer.user_sessions: ~0 rows (approximately)
 
--- Dumping structure for table abandoned_explorer.groups
-CREATE TABLE IF NOT EXISTS `groups` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `uuid` char(36) DEFAULT NULL,
-  `name` varchar(100) NOT NULL,
-  `description` text DEFAULT NULL,
-  `invite_code` varchar(8) NOT NULL,
-  `created_by` int(11) NOT NULL,
-  `is_private` tinyint(1) DEFAULT 0,
-  `member_limit` int(11) DEFAULT 50,
-  `avatar_color` varchar(7) DEFAULT '#7289da',
-  `emoji` varchar(10) DEFAULT '🏚️',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uuid` (`uuid`),
-  UNIQUE KEY `invite_code` (`invite_code`),
-  KEY `idx_uuid` (`uuid`),
-  KEY `idx_invite_code` (`invite_code`),
-  KEY `idx_created_by` (`created_by`),
-  KEY `idx_created_at` (`created_at`),
-  CONSTRAINT `groups_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Dumping data for table abandoned_explorer.groups: ~0 rows (approximately)
-
--- Dumping structure for table abandoned_explorer.group_members
-CREATE TABLE IF NOT EXISTS `group_members` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `uuid` char(36) DEFAULT NULL,
-  `group_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `role` enum('owner','admin','member') DEFAULT 'member',
-  `nickname` varchar(50) DEFAULT NULL,
-  `joined_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `last_active_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uuid` (`uuid`),
-  UNIQUE KEY `unique_group_member` (`group_id`,`user_id`),
-  KEY `idx_uuid` (`uuid`),
-  KEY `idx_group_members` (`group_id`,`joined_at`),
-  KEY `idx_user_groups` (`user_id`,`joined_at`),
-  KEY `idx_role` (`role`),
-  CONSTRAINT `group_members_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `group_members_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Dumping data for table abandoned_explorer.group_members: ~0 rows (approximately)
-
--- Dumping structure for table abandoned_explorer.group_messages
-CREATE TABLE IF NOT EXISTS `group_messages` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `uuid` char(36) DEFAULT NULL,
-  `group_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `message_type` enum('text','location','image','system') DEFAULT 'text',
-  `content` text DEFAULT NULL,
-  `location_id` int(11) DEFAULT NULL,
-  `image_url` varchar(500) DEFAULT NULL,
-  `reply_to_id` int(11) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uuid` (`uuid`),
-  KEY `idx_uuid` (`uuid`),
-  KEY `idx_group_messages` (`group_id`,`created_at`),
-  KEY `idx_user_messages` (`user_id`,`created_at`),
-  KEY `idx_location_id` (`location_id`),
-  KEY `idx_reply_to` (`reply_to_id`),
-  CONSTRAINT `group_messages_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `group_messages_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `group_messages_ibfk_3` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `group_messages_ibfk_4` FOREIGN KEY (`reply_to_id`) REFERENCES `group_messages` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Dumping data for table abandoned_explorer.group_messages: ~0 rows (approximately)
-
--- Dumping structure for table abandoned_explorer.group_locations
-CREATE TABLE IF NOT EXISTS `group_locations` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `uuid` char(36) DEFAULT NULL,
-  `group_id` int(11) NOT NULL,
-  `location_id` int(11) NOT NULL,
-  `shared_by` int(11) NOT NULL,
-  `notes` text DEFAULT NULL,
-  `is_pinned` tinyint(1) DEFAULT 0,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uuid` (`uuid`),
-  UNIQUE KEY `unique_group_location` (`group_id`,`location_id`),
-  KEY `idx_uuid` (`uuid`),
-  KEY `idx_group_locations` (`group_id`,`created_at`),
-  KEY `idx_location_groups` (`location_id`),
-  KEY `idx_shared_by` (`shared_by`),
-  KEY `idx_pinned` (`group_id`,`is_pinned`),
-  CONSTRAINT `group_locations_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `group_locations_ibfk_2` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `group_locations_ibfk_3` FOREIGN KEY (`shared_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Dumping data for table abandoned_explorer.group_locations: ~0 rows (approximately)
-
 -- Dumping structure for table abandoned_explorer.group_message_likes
 CREATE TABLE IF NOT EXISTS `group_message_likes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) DEFAULT NULL,
   `message_id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_message_like` (`message_id`,`user_id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_uuid` (`uuid`),
   KEY `idx_message_likes` (`message_id`),
   KEY `idx_user_likes` (`user_id`),
   CONSTRAINT `group_message_likes_ibfk_1` FOREIGN KEY (`message_id`) REFERENCES `group_messages` (`id`) ON DELETE CASCADE,
@@ -1065,6 +1090,63 @@ CREATE TABLE IF NOT EXISTS `group_message_likes` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Dumping data for table abandoned_explorer.group_message_likes: ~0 rows (approximately)
+
+-- Dumping structure for table abandoned_explorer.group_bans
+CREATE TABLE IF NOT EXISTS `group_bans` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) DEFAULT NULL,
+  `group_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `banned_by` int(11) NOT NULL,
+  `ban_reason` text DEFAULT NULL,
+  `ban_type` enum('kick','ban') DEFAULT 'ban',
+  `is_permanent` tinyint(1) DEFAULT 1,
+  `expires_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `unbanned_at` timestamp NULL DEFAULT NULL,
+  `unbanned_by` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_active_ban` (`group_id`,`user_id`,`unbanned_at`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_uuid` (`uuid`),
+  KEY `idx_group_bans` (`group_id`,`created_at`),
+  KEY `idx_user_bans` (`user_id`,`created_at`),
+  KEY `idx_banned_by` (`banned_by`),
+  KEY `idx_unbanned_by` (`unbanned_by`),
+  KEY `idx_ban_type` (`ban_type`),
+  KEY `idx_active_bans` (`group_id`,`unbanned_at`),
+  CONSTRAINT `group_bans_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_bans_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_bans_ibfk_3` FOREIGN KEY (`banned_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_bans_ibfk_4` FOREIGN KEY (`unbanned_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for table abandoned_explorer.group_bans: ~0 rows (approximately)
+
+-- Dumping structure for table abandoned_explorer.group_admin_actions
+CREATE TABLE IF NOT EXISTS `group_admin_actions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) DEFAULT NULL,
+  `group_id` int(11) NOT NULL,
+  `admin_id` int(11) NOT NULL,
+  `target_user_id` int(11) DEFAULT NULL,
+  `action_type` enum('kick','ban','unban','delete_message','promote','demote','delete_group') NOT NULL,
+  `reason` text DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_uuid` (`uuid`),
+  KEY `idx_group_actions` (`group_id`,`created_at`),
+  KEY `idx_admin_actions` (`admin_id`,`created_at`),
+  KEY `idx_target_user` (`target_user_id`),
+  KEY `idx_action_type` (`action_type`),
+  CONSTRAINT `group_admin_actions_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_admin_actions_ibfk_2` FOREIGN KEY (`admin_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_admin_actions_ibfk_3` FOREIGN KEY (`target_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for table abandoned_explorer.group_admin_actions: ~0 rows (approximately)
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;

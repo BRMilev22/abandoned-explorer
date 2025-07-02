@@ -110,6 +110,157 @@ struct VideoController: UIViewControllerRepresentable {
     }
 }
 
+// MARK: - Fullscreen Image View
+struct FullscreenImageView: View {
+    let mediaItems: [MediaItem]
+    @Binding var selectedIndex: Int
+    @Binding var isPresented: Bool
+    @State private var currentScale: CGFloat = 1.0
+    @State private var currentOffset: CGSize = .zero
+    
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            if !mediaItems.isEmpty {
+                TabView(selection: $selectedIndex) {
+                    ForEach(0..<mediaItems.count, id: \.self) { index in
+                        ZStack {
+                            // Only show images in fullscreen mode, skip videos
+                            if !mediaItems[index].isVideo {
+                                CachedAsyncImage(url: mediaItems[index].url) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .scaleEffect(currentScale)
+                                        .offset(currentOffset)
+                                        .gesture(
+                                            SimultaneousGesture(
+                                                // Magnification gesture for pinch to zoom
+                                                MagnificationGesture()
+                                                    .onChanged { value in
+                                                        currentScale = value
+                                                    }
+                                                    .onEnded { _ in
+                                                        withAnimation(.spring()) {
+                                                            if currentScale < 1.0 {
+                                                                currentScale = 1.0
+                                                                currentOffset = .zero
+                                                            } else if currentScale > 3.0 {
+                                                                currentScale = 3.0
+                                                            }
+                                                        }
+                                                    },
+                                                // Drag gesture for panning when zoomed
+                                                DragGesture()
+                                                    .onChanged { value in
+                                                        if currentScale > 1.0 {
+                                                            currentOffset = value.translation
+                                                        }
+                                                    }
+                                                    .onEnded { _ in
+                                                        if currentScale <= 1.0 {
+                                                            withAnimation(.spring()) {
+                                                                currentOffset = .zero
+                                                            }
+                                                        }
+                                                    }
+                                            )
+                                        )
+                                        .onTapGesture(count: 2) {
+                                            // Double tap to zoom
+                                            withAnimation(.spring()) {
+                                                if currentScale == 1.0 {
+                                                    currentScale = 2.0
+                                                } else {
+                                                    currentScale = 1.0
+                                                    currentOffset = .zero
+                                                }
+                                            }
+                                        }
+                                } placeholder: {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                }
+                            } else {
+                                // For videos, show a message
+                                VStack(spacing: 20) {
+                                    Image(systemName: "play.circle.fill")
+                                        .font(.system(size: 80))
+                                        .foregroundColor(.white.opacity(0.8))
+                                    
+                                    Text("Video content")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                    
+                                    Text("Videos cannot be displayed in fullscreen mode")
+                                        .font(.subheadline)
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .multilineTextAlignment(.center)
+                                }
+                            }
+                        }
+                        .tag(index)
+                    }
+                }
+                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                
+                // Page indicators
+                if mediaItems.count > 1 {
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 8) {
+                            ForEach(Array(mediaItems.enumerated()), id: \.offset) { index, mediaItem in
+                                Circle()
+                                    .fill(selectedIndex == index ? Color.white : Color.white.opacity(0.5))
+                                    .frame(width: 10, height: 10)
+                                    .overlay(
+                                        // Add a small video icon for video items
+                                        mediaItem.isVideo ? 
+                                        Image(systemName: "play.fill")
+                                            .font(.system(size: 5))
+                                            .foregroundColor(.black)
+                                        : nil
+                                    )
+                            }
+                        }
+                        .padding(.bottom, 50)
+                    }
+                }
+            }
+            
+            // Close button
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        isPresented = false
+                        // Reset zoom when closing
+                        currentScale = 1.0
+                        currentOffset = .zero
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .padding(12)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.top, 50)
+                }
+                Spacer()
+            }
+        }
+        .onDisappear {
+            // Reset zoom when view disappears
+            currentScale = 1.0
+            currentOffset = .zero
+        }
+    }
+}
+
 struct LocationDetailModalView: View {
     @EnvironmentObject var dataManager: DataManager
     @EnvironmentObject var locationManager: LocationManager
@@ -128,7 +279,7 @@ struct LocationDetailModalView: View {
     @State private var selectedImageIndex = 0
     @State private var showingShareSheet = false
     @State private var chatMessage = ""
-    @State private var isAudioMuted = false
+
     @State private var commentOffset = 0
     @State private var hasMoreComments = true
     @State private var isPostingComment = false
@@ -283,6 +434,15 @@ struct LocationDetailModalView: View {
         .sheet(isPresented: $showingShareSheet) {
             ShareSheet(activityItems: [shareText])
         }
+        .fullScreenCover(isPresented: $showingFullscreenImage) {
+            if let details = locationDetails {
+                FullscreenImageView(
+                    mediaItems: details.images.map { .image($0) } + details.videos.map { .video($0) },
+                    selectedIndex: $selectedImageIndex,
+                    isPresented: $showingFullscreenImage
+                )
+            }
+        }
         .onAppear {
             print("🎬 LocationDetailModalView appeared for location: \(location.title) (ID: \(location.id))")
             
@@ -400,25 +560,7 @@ struct LocationDetailModalView: View {
                     }
                 }
                 
-                // Mute/Unmute Button (top right)
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            isAudioMuted.toggle()
-                        }) {
-                            Image(systemName: isAudioMuted ? "speaker.slash.fill" : "speaker.2.fill")
-                                .foregroundColor(.white)
-                                .font(.title2)
-                                .padding(12)
-                                .background(Color.black.opacity(0.6))
-                                .clipShape(Circle())
-                        }
-                        .padding(.trailing, 16)
-                        .padding(.top, 60)
-                    }
-                    Spacer()
-                }
+
                 
                 // Fullscreen button (bottom right)
                 VStack {
@@ -441,7 +583,7 @@ struct LocationDetailModalView: View {
                 }
             }
         }
-        .frame(height: UIScreen.main.bounds.height * 0.4) // 40% of screen height
+        .frame(height: UIScreen.main.bounds.height * 0.3) // 30% of screen height
         .clipped()
     }
     

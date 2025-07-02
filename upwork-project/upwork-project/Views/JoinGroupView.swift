@@ -13,6 +13,8 @@ struct JoinGroupView: View {
     
     @State private var inviteCode = ""
     @State private var showingScanner = false
+    @State private var showingBanAlert = false
+    @State private var banErrorMessage = ""
     
     let accentColor = Color(hex: "#7289da")
     
@@ -58,6 +60,11 @@ struct JoinGroupView: View {
                 inviteCode = code
                 showingScanner = false
             }
+        }
+        .alert("Cannot Join Group", isPresented: $showingBanAlert) {
+            Button("OK") { }
+        } message: {
+            Text(banErrorMessage)
         }
     }
     
@@ -244,12 +251,39 @@ struct JoinGroupView: View {
     
     private func joinGroup() {
         let trimmedCode = inviteCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        dataManager.joinGroup(inviteCode: trimmedCode)
         
-        // Close the view when group is joined
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            if !dataManager.isJoiningGroup {
-                presentationMode.wrappedValue.dismiss()
+        // First check if user is banned from this group
+        dataManager.checkBanStatus(inviteCode: trimmedCode) { result in
+            switch result {
+            case .success(let response):
+                if response.success && (response.canJoin ?? false) {
+                    // User is not banned, proceed with joining
+                    dataManager.joinGroup(inviteCode: trimmedCode)
+                    
+                    // Close the view when group is joined
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        if !dataManager.isJoiningGroup {
+                            presentationMode.wrappedValue.dismiss()
+                        }
+                    }
+                } else {
+                    // User is banned
+                    banErrorMessage = response.error ?? "You are banned from this group."
+                    if let reason = response.banReason {
+                        banErrorMessage += "\n\nReason: \(reason)"
+                    }
+                    showingBanAlert = true
+                }
+            case .failure(let error):
+                // If ban check fails, try to join anyway (maybe it's just a network error)
+                dataManager.joinGroup(inviteCode: trimmedCode)
+                
+                // Close the view when group is joined
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    if !dataManager.isJoiningGroup {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
             }
         }
     }

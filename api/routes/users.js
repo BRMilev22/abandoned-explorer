@@ -21,7 +21,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const [users] = await pool.execute(`
       SELECT 
-        u.id, u.username, u.email, u.age, u.is_premium, u.profile_image_url, u.created_at,
+        u.id, u.username, u.email, u.age, u.is_premium, u.profile_image_url, u.created_at, u.region,
         COUNT(DISTINCT l.id) as submitted_locations,
         COUNT(DISTINCT CASE WHEN l.is_approved = TRUE THEN l.id END) as approved_locations,
         COUNT(DISTINCT b.id) as bookmarked_locations,
@@ -153,6 +153,61 @@ router.put('/profile', [
     console.error('Update profile error:', error);
     res.status(500).json({
       error: 'Failed to update profile',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/users/region:
+ *   put:
+ *     summary: Update user region
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               region:
+ *                 type: string
+ *                 description: User's region (EU, US, AMERICAS, ASIA, AFRICA, etc.)
+ *     responses:
+ *       200:
+ *         description: Region updated successfully
+ */
+router.put('/region', [
+  authenticateToken,
+  body('region').isString().isLength({ min: 1, max: 20 }).trim()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: errors.array()
+      });
+    }
+
+    const { region } = req.body;
+
+    await pool.execute(
+      'UPDATE users SET region = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [region, req.user.userId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Region updated successfully'
+    });
+  } catch (error) {
+    console.error('Update user region error:', error);
+    res.status(500).json({
+      error: 'Failed to update region',
       message: error.message
     });
   }

@@ -14,6 +14,7 @@ struct User: Identifiable, Codable {
     var age: Int?
     var preferences: [String]? // Category names as strings
     var isPremium: Bool
+    var region: String
     var joinDate: Date
     var profileImageURL: String?
     var submittedLocations: Int?
@@ -23,7 +24,7 @@ struct User: Identifiable, Codable {
     
     // Custom coding keys to match API response
     enum CodingKeys: String, CodingKey {
-        case id, username, email, age, preferences
+        case id, username, email, age, preferences, region
         case isPremium = "is_premium"
         case joinDate = "created_at"
         case profileImageURL = "profile_image_url"
@@ -42,6 +43,7 @@ struct User: Identifiable, Codable {
         email = try container.decode(String.self, forKey: .email)
         age = try container.decodeIfPresent(Int.self, forKey: .age)
         preferences = try container.decodeIfPresent([String].self, forKey: .preferences) ?? []
+        region = try container.decodeIfPresent(String.self, forKey: .region) ?? "Unknown"
         
         // Handle is_premium as either Bool or Int (database returns 0/1)
         if let premiumBool = try? container.decode(Bool.self, forKey: .isPremium) {
@@ -91,6 +93,7 @@ struct User: Identifiable, Codable {
         try container.encodeIfPresent(age, forKey: .age)
         try container.encodeIfPresent(preferences, forKey: .preferences)
         try container.encode(isPremium, forKey: .isPremium)
+        try container.encode(region, forKey: .region)
         try container.encode(joinDate, forKey: .joinDate)
         try container.encodeIfPresent(profileImageURL, forKey: .profileImageURL)
         try container.encodeIfPresent(submittedLocations, forKey: .submittedLocations)
@@ -100,13 +103,14 @@ struct User: Identifiable, Codable {
     }
     
     // Convenience initializer for testing/previews
-    init(id: Int, username: String, email: String, age: Int? = nil, preferences: [String]? = nil, isPremium: Bool = false, joinDate: Date = Date(), profileImageURL: String? = nil, submittedLocations: Int? = 0, approvedLocations: Int? = 0, bookmarkedLocations: Int? = 0, likedLocations: Int? = 0) {
+    init(id: Int, username: String, email: String, age: Int? = nil, preferences: [String]? = nil, isPremium: Bool = false, region: String = "Unknown", joinDate: Date = Date(), profileImageURL: String? = nil, submittedLocations: Int? = 0, approvedLocations: Int? = 0, bookmarkedLocations: Int? = 0, likedLocations: Int? = 0) {
         self.id = id
         self.username = username
         self.email = email
         self.age = age
         self.preferences = preferences
         self.isPremium = isPremium
+        self.region = region
         self.joinDate = joinDate
         self.profileImageURL = profileImageURL
         self.submittedLocations = submittedLocations

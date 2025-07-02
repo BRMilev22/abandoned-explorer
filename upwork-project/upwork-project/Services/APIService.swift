@@ -324,6 +324,18 @@ class APIService: ObservableObject {
             .eraseToAnyPublisher()
     }
     
+    func updateUserRegion(region: String) -> AnyPublisher<Bool, APIError> {
+        let body = ["region": region]
+        guard let data = try? JSONEncoder().encode(body) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(endpoint: "/users/region", method: .PUT, body: data, responseType: APISuccessResponse.self)
+            .map { _ in true }
+            .eraseToAnyPublisher()
+    }
+    
     // MARK: - Dynamic Data Methods
     
     func getCategories() -> AnyPublisher<[DynamicCategory], APIError> {
@@ -803,6 +815,88 @@ class APIService: ObservableObject {
     
     func likeGroupMessage(_ groupId: Int, messageId: Int) -> AnyPublisher<APISuccessResponse, APIError> {
         return makeRequest(endpoint: "/groups/\(groupId)/messages/\(messageId)/like", method: .POST, responseType: APISuccessResponse.self)
+    }
+    
+    // MARK: - Group Management Methods
+    
+    func kickMember(_ groupId: Int, userId: Int, reason: String?) -> AnyPublisher<AdminActionResponse, APIError> {
+        let body = KickMemberRequest(userId: userId, reason: reason)
+        let encoder = JSONEncoder()
+        
+        guard let data = try? encoder.encode(body) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(endpoint: "/groups/\(groupId)/kick", method: .POST, body: data, responseType: AdminActionResponse.self)
+    }
+    
+    func banMember(_ groupId: Int, userId: Int, reason: String?, isPermanent: Bool = true) -> AnyPublisher<AdminActionResponse, APIError> {
+        let body = BanMemberRequest(userId: userId, reason: reason, isPermanent: isPermanent)
+        let encoder = JSONEncoder()
+        
+        guard let data = try? encoder.encode(body) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(endpoint: "/groups/\(groupId)/ban", method: .POST, body: data, responseType: AdminActionResponse.self)
+    }
+    
+    func unbanMember(_ groupId: Int, userId: Int) -> AnyPublisher<AdminActionResponse, APIError> {
+        let body = UnbanMemberRequest(userId: userId)
+        let encoder = JSONEncoder()
+        
+        guard let data = try? encoder.encode(body) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(endpoint: "/groups/\(groupId)/unban", method: .POST, body: data, responseType: AdminActionResponse.self)
+    }
+    
+    func getBannedUsers(_ groupId: Int) -> AnyPublisher<BannedUsersResponse, APIError> {
+        return makeRequest(endpoint: "/groups/\(groupId)/banned", method: .GET, responseType: BannedUsersResponse.self)
+    }
+    
+    func deleteGroup(_ groupId: Int) -> AnyPublisher<AdminActionResponse, APIError> {
+        return makeRequest(endpoint: "/groups/\(groupId)", method: .DELETE, responseType: AdminActionResponse.self)
+    }
+    
+    func promoteMember(_ groupId: Int, userId: Int, newRole: GroupRole) -> AnyPublisher<AdminActionResponse, APIError> {
+        let body = PromoteMemberRequest(userId: userId, newRole: newRole.rawValue)
+        let encoder = JSONEncoder()
+        
+        guard let data = try? encoder.encode(body) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(endpoint: "/groups/\(groupId)/promote", method: .POST, body: data, responseType: AdminActionResponse.self)
+    }
+    
+    func demoteMember(_ groupId: Int, userId: Int) -> AnyPublisher<AdminActionResponse, APIError> {
+        let body = PromoteMemberRequest(userId: userId, newRole: GroupRole.member.rawValue)
+        let encoder = JSONEncoder()
+        
+        guard let data = try? encoder.encode(body) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(endpoint: "/groups/\(groupId)/promote", method: .POST, body: data, responseType: AdminActionResponse.self)
+    }
+    
+    func checkBanStatus(inviteCode: String) -> AnyPublisher<CheckBanResponse, APIError> {
+        let body = CheckBanRequest(inviteCode: inviteCode)
+        let encoder = JSONEncoder()
+        
+        guard let data = try? encoder.encode(body) else {
+            return Fail(error: APIError.encodingError)
+                .eraseToAnyPublisher()
+        }
+        
+        return makeRequest(endpoint: "/groups/check-ban", method: .POST, body: data, responseType: CheckBanResponse.self)
     }
 }
 

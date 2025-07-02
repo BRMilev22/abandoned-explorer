@@ -18,9 +18,21 @@ struct GroupsView: View {
     @State private var isViewVisible = false
     @State private var messageAppearDelay: Double = 0
     
+    // Group management state variables
+    @State private var selectedMemberForAction: GroupMember?
+    @State private var showingMemberActionSheet = false
+    @State private var showingBannedUsers = false
+    @State private var showingDeleteGroupAlert = false
+    @State private var showingKickConfirmation = false
+    @State private var showingBanConfirmation = false
+    @State private var showingPromoteConfirmation = false
+    @State private var reasonText = ""
+    @State private var showingReasonDialog = false
+    @State private var pendingAction: (() -> Void)?
+    
     let accentColor = Color(hex: "#7289da")
     
-    private let tabs = ["Activity", "Members", "Chat", "Locations", "Settings"]
+    private let tabs = ["Group", "Members", "Chat", "Locations", "Settings"]
     
     var body: some View {
         VStack(spacing: 0) {
@@ -74,6 +86,8 @@ struct GroupsView: View {
             }
             // Clean up keyboard observers
             cancellables.removeAll()
+            // Clear group selection to stop monitoring
+            dataManager.clearGroupSelection()
         }
         .onChange(of: dataManager.userGroups) { groups in
             // When groups are loaded, load members for the first group
@@ -94,6 +108,78 @@ struct GroupsView: View {
             if let firstGroup = dataManager.userGroups.first {
                 dataManager.updateMemberActivity(firstGroup.id)
             }
+        }
+        .actionSheet(isPresented: $showingMemberActionSheet) {
+            memberActionSheet
+        }
+        .sheet(isPresented: $showingBannedUsers) {
+            bannedUsersView
+        }
+        .alert("Delete Group", isPresented: $showingDeleteGroupAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                if let group = dataManager.selectedGroup ?? dataManager.userGroups.first {
+                    dataManager.deleteGroup(group.id)
+                }
+            }
+            .disabled(dataManager.isPerformingAdminAction)
+        } message: {
+            Text("This action cannot be undone. All messages and data will be lost.")
+        }
+        .alert("Kick Member", isPresented: $showingKickConfirmation) {
+            Button("Cancel", role: .cancel) { 
+                resetActionState()
+            }
+            Button("Kick", role: .destructive) {
+                if let member = selectedMemberForAction,
+                   let group = dataManager.selectedGroup ?? dataManager.userGroups.first {
+                    dataManager.kickMember(group.id, userId: member.id, reason: reasonText.isEmpty ? nil : reasonText)
+                }
+                resetActionState()
+            }
+            .disabled(dataManager.isPerformingAdminAction)
+        } message: {
+            if let member = selectedMemberForAction {
+                Text("Remove \(member.username) from the group? They can rejoin with an invite code.")
+            }
+        }
+        .alert("Ban Member", isPresented: $showingBanConfirmation) {
+            Button("Cancel", role: .cancel) { 
+                resetActionState()
+            }
+            Button("Ban", role: .destructive) {
+                if let member = selectedMemberForAction,
+                   let group = dataManager.selectedGroup ?? dataManager.userGroups.first {
+                    dataManager.banMember(group.id, userId: member.id, reason: reasonText.isEmpty ? nil : reasonText)
+                }
+                resetActionState()
+            }
+            .disabled(dataManager.isPerformingAdminAction)
+        } message: {
+            if let member = selectedMemberForAction {
+                Text("Ban \(member.username) from the group? They will not be able to rejoin.")
+            }
+        }
+        .alert("Change Role", isPresented: $showingPromoteConfirmation) {
+            Button("Cancel", role: .cancel) { 
+                resetActionState()
+            }
+            Button("Confirm") {
+                pendingAction?()
+                resetActionState()
+            }
+            .disabled(dataManager.isPerformingAdminAction)
+        } message: {
+            if let member = selectedMemberForAction {
+                Text("Change \(member.username)'s role?")
+            }
+        }
+        .alert("Removed from Group", isPresented: $dataManager.wasRemovedFromGroup) {
+            Button("OK") {
+                // Alert will automatically dismiss and flag will be reset
+            }
+        } message: {
+            Text(dataManager.removalReason ?? "You have been removed from this group")
         }
     }
     
@@ -225,94 +311,128 @@ struct GroupsView: View {
         }
     }
     
-    private func infoCardsSection(for group: Group) -> some View {
-        VStack(spacing: 16) {
-            // First row - Member count and Active time
-            HStack(spacing: 20) {
-                // Member count
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Members")
-                        .font(.system(size: 14, weight: .medium))
+    private func horizontalInfoSection(for group: Group) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                // Region Card
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Region")
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.gray)
                     
-                    Text("\(group.memberCount)")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.white)
+                    HStack(spacing: 6) {
+                        Image(systemName: "globe")
+                            .font(.system(size: 14))
+                            .foregroundColor(accentColor)
+                        
+                        Text(group.region)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.05))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(accentColor.opacity(0.3), lineWidth: 1)
+                        )
+                )
                 
-                // Active time
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Active Time")
-                        .font(.system(size: 14, weight: .medium))
+                // Points Card
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Points")
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.gray)
                     
-                    Text(activeTimeString(for: group))
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.white)
+                    HStack(spacing: 6) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.yellow)
+                        
+                        Text("\(group.points)")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            
-            // Second row - Group code and Team button
-            HStack(spacing: 20) {
-                // Group code
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Group Code")
-                        .font(.system(size: 14, weight: .medium))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.05))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                
+                // Team Code Card
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Team Code")
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.gray)
                     
                     HStack(spacing: 8) {
                         Text(group.inviteCode)
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
                             .tracking(1)
                         
                         Button(action: {
                             UIPasteboard.general.string = group.inviteCode
+                            // Add haptic feedback
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
                         }) {
                             Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 16))
+                                .font(.system(size: 12))
                                 .foregroundColor(accentColor)
                         }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                // Team button
-                VStack(spacing: 4) {
-                    Button(action: {
-                        // Team settings action
-                    }) {
-                        VStack(spacing: 4) {
-                            Image(systemName: "person.2.fill")
-                                .font(.system(size: 18))
-                                .foregroundColor(.white)
-                            
-                            Text("Team")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.gray)
-                        }
-                        .frame(width: 60, height: 60)
-                        .background(Color.white.opacity(0.1))
-                        .cornerRadius(12)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.05))
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                .stroke(Color.green.opacity(0.3), lineWidth: 1)
                         )
+                )
+                
+                // Active Time Card
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Active Time")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.orange)
+                        
+                        Text(activeTimeString(for: group))
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
                     }
                 }
-            }
-        }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.05))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                        )
                 )
-        )
+            }
+            .padding(.horizontal, 20)
+        }
+        .scrollTargetBehavior(.viewAligned)
     }
     
     private func teammatesSection(for group: Group) -> some View {
@@ -426,7 +546,7 @@ struct GroupsView: View {
     @ViewBuilder
     private func tabContentView(for group: Group) -> some View {
         switch selectedTab {
-        case 0: // Activity
+                                case 0: // Group
             activityTabView(for: group)
         case 1: // Members
             membersTabView(for: group)
@@ -441,8 +561,8 @@ struct GroupsView: View {
     
     private func activityTabView(for group: Group) -> some View {
         VStack(spacing: 20) {
-            // Info cards section
-            infoCardsSection(for: group)
+            // Horizontal info section
+            horizontalInfoSection(for: group)
             
             // My Teammates section
             teammatesSection(for: group)
@@ -450,22 +570,64 @@ struct GroupsView: View {
     }
     
     private func membersTabView(for group: Group) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Group Members")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Members")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                Text("\(dataManager.groupMembers.count)/\(group.memberLimit)")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.gray)
+            }
+            
+            // Admin hint for owners/admins
+            if let myRole = group.myRole, myRole.canManageGroup {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(accentColor)
+                    
+                    Text("Tap 'Manage' next to members to kick, ban, or promote them")
+                        .font(.system(size: 14))
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(accentColor.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(accentColor.opacity(0.3), lineWidth: 1)
+                        )
+                )
+            }
             
             if dataManager.isLoadingGroupMembers {
-                HStack {
-                    Spacer()
+                // Loading state
+                VStack(spacing: 12) {
                     ProgressView()
+                        .scaleEffect(1.2)
                         .progressViewStyle(CircularProgressViewStyle(tint: accentColor))
-                    Spacer()
+                    
+                    Text("Loading members...")
+                        .font(.system(size: 16))
+                        .foregroundColor(.gray)
                 }
+                .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
             } else {
-                LazyVStack(spacing: 16) {
-                    ForEach(dataManager.groupMembers) { member in
+                LazyVStack(spacing: 12) {
+                    ForEach(dataManager.groupMembers.sorted(by: { 
+                        if $0.role == .owner && $1.role != .owner { return true }
+                        if $1.role == .owner && $0.role != .owner { return false }
+                        if $0.role == .admin && $1.role == .member { return true }
+                        if $1.role == .admin && $0.role == .member { return false }
+                        return $0.username < $1.username
+                    })) { member in
                         memberRowView(member: member)
                     }
                 }
@@ -474,70 +636,95 @@ struct GroupsView: View {
     }
     
     private func memberRowView(member: GroupMember) -> some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             // Avatar
-            ZStack {
+            AsyncImage(url: URL(string: member.profileImageUrl ?? "")) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
                 Circle()
-                    .fill(accentColor.opacity(0.2))
-                    .frame(width: 50, height: 50)
+                    .fill(LinearGradient(
+                        gradient: Gradient(colors: [accentColor.opacity(0.6), accentColor.opacity(0.3)]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
                     .overlay(
-                        Circle()
-                            .stroke(accentColor, lineWidth: 2)
+                        Text(String(member.username.prefix(1)).uppercased())
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
                     )
-                
-                Text(String(member.username.prefix(1).uppercased()))
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.white)
-                
-                // Online indicator
-                if member.isOnline {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 16, height: 16)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.black, lineWidth: 2)
-                        )
-                        .offset(x: 18, y: -18)
-                }
             }
+            .frame(width: 40, height: 40)
+            .clipShape(Circle())
             
-            // Member info
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
-                    Text(member.nickname ?? member.username)
-                        .font(.system(size: 16, weight: .semibold))
+                    Text(member.username)
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
                     
-                    // Role badge
                     roleBadgeView(for: member.role)
+                    
+                    if member.isOnline {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 8, height: 8)
+                    }
                 }
                 
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(member.isOnline ? Color.green : Color.gray)
-                        .frame(width: 8, height: 8)
-                    
-                    Text(member.isOnline ? "Online" : "Last seen \(member.minutesSinceActive)m ago")
-                        .font(.system(size: 14))
-                        .foregroundColor(.gray)
-                }
+                Text(member.isOnline ? "Online" : "\(member.minutesSinceActive)m ago")
+                    .font(.system(size: 14))
+                    .foregroundColor(.gray)
             }
             
             Spacer()
+            
+            // Admin actions button (only for admins/owners and not for themselves)
+            if let currentGroup = dataManager.selectedGroup ?? dataManager.userGroups.first,
+               let myRole = currentGroup.myRole,
+               myRole.canManageGroup,
+               member.id != dataManager.currentUser?.id {
+                
+                Button(action: {
+                    selectedMemberForAction = member
+                    showingMemberActionSheet = true
+                }) {
+                    HStack(spacing: 6) {
+                        if dataManager.isPerformingAdminAction {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        } else {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                        }
+                        
+                        Text(dataManager.isPerformingAdminAction ? "Processing..." : "Manage")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(accentColor.opacity(dataManager.isPerformingAdminAction ? 0.6 : 0.8))
+                    )
+                }
+                .disabled(dataManager.isPerformingAdminAction)
+            }
         }
-        .padding(16)
+        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                )
         )
     }
     
-        private func chatTabView(for group: Group) -> some View {
+    @State private var replyingToMessage: GroupMessage?
+    
+    private func chatTabView(for group: Group) -> some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 // Compact messages area - fixed height that leaves room for everything
@@ -637,8 +824,6 @@ struct GroupsView: View {
             .background(Color.black)
         }
     }
-    
-    @State private var replyingToMessage: GroupMessage?
     
     private func compactMessageRowView(message: GroupMessage) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -904,12 +1089,96 @@ struct GroupsView: View {
                 // Group info
                 groupInfoSection(for: group)
                 
+                // Admin sections (only for owners/admins)
+                if let myRole = group.myRole, myRole.canViewBannedUsers {
+                    adminActionsSection(for: group)
+                }
+                
                 // Actions
                 VStack(spacing: 12) {
                     copyInviteCodeButton(for: group)
-                    leaveGroupButton(for: group)
+                    
+                    if let myRole = group.myRole, myRole.canDeleteGroup {
+                        deleteGroupButton(for: group)
+                    } else {
+                        leaveGroupButton(for: group)
+                    }
+                }
+                
+                // Add extra bottom padding to account for tab bar
+                Spacer()
+                    .frame(height: 120)
+            }
+        }
+    }
+    
+    private func adminActionsSection(for group: Group) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Admin Actions")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+            
+            VStack(spacing: 8) {
+                Button(action: {
+                    showingBannedUsers = true
+                    dataManager.loadBannedUsers(group.id)
+                }) {
+                    HStack {
+                        Image(systemName: "person.slash.fill")
+                            .foregroundColor(.orange)
+                        
+                        Text("Manage Banned Users")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                        
+                        if !dataManager.bannedUsers.isEmpty {
+                            Text("\(dataManager.bannedUsers.filter(\.isActive).count)")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.orange)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.orange.opacity(0.2))
+                                )
+                        }
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                    }
+                    .padding(16)
+                    .background(cardBackground)
                 }
             }
+        }
+    }
+    
+    private func deleteGroupButton(for group: Group) -> some View {
+        Button(action: {
+            showingDeleteGroupAlert = true
+        }) {
+            HStack {
+                Image(systemName: "trash.fill")
+                    .foregroundColor(.red)
+                
+                Text("Delete Group")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.red)
+                
+                Spacer()
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.red.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                    )
+            )
         }
     }
     
@@ -1049,72 +1318,24 @@ struct GroupsView: View {
     }
     
     private var actionButtonsSection: some View {
-        VStack(spacing: 16) {
-            createGroupButton
-            joinGroupButton
+        VStack(spacing: 20) {
+            // Modern animated Create Group button with moving border
+            ModernAnimatedButton(title: "Create Group") {
+                showingCreateGroup = true
+            }
+            .scaleEffect(isViewVisible ? 1 : 0.8)
+            .opacity(isViewVisible ? 1 : 0)
+            .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.4), value: isViewVisible)
+            
+            // Modern animated Join Group button with moving border
+            ModernAnimatedButton(title: "Join with Code") {
+                showingJoinGroup = true
+            }
+            .scaleEffect(isViewVisible ? 1 : 0.8)
+            .opacity(isViewVisible ? 1 : 0)
+            .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5), value: isViewVisible)
         }
         .padding(.horizontal, 40)
-    }
-    
-    private var createGroupButton: some View {
-        Button(action: { 
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-            showingCreateGroup = true 
-        }) {
-            HStack(spacing: 12) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 18))
-                
-                Text("Create Group")
-                    .font(.system(size: 18, weight: .semibold))
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(createGroupButtonBackground)
-            .cornerRadius(16)
-            .shadow(color: accentColor.opacity(0.3), radius: 8, x: 0, y: 4)
-        }
-        .scaleEffect(isViewVisible ? 1 : 0.8)
-        .opacity(isViewVisible ? 1 : 0)
-        .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.4), value: isViewVisible)
-    }
-    
-    private var createGroupButtonBackground: some View {
-        LinearGradient(
-            gradient: Gradient(colors: [accentColor, accentColor.opacity(0.8)]),
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-    }
-    
-    private var joinGroupButton: some View {
-        Button(action: { 
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-            showingJoinGroup = true 
-        }) {
-            HStack(spacing: 12) {
-                Image(systemName: "person.badge.plus")
-                    .font(.system(size: 18))
-                
-                Text("Join with Code")
-                    .font(.system(size: 18, weight: .medium))
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Color.white.opacity(0.08))
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-            )
-        }
-        .scaleEffect(isViewVisible ? 1 : 0.8)
-        .opacity(isViewVisible ? 1 : 0)
-        .animation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5), value: isViewVisible)
     }
     
     // MARK: - Helper Functions
@@ -1183,6 +1404,228 @@ struct GroupsView: View {
     
     private func dismissKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+    
+    // MARK: - Group Management UI Components
+    
+    private var memberActionSheet: ActionSheet {
+        guard let member = selectedMemberForAction,
+              let group = dataManager.selectedGroup ?? dataManager.userGroups.first,
+              let myRole = group.myRole else {
+            return ActionSheet(title: Text("Error"), buttons: [.cancel()])
+        }
+        
+        var buttons: [ActionSheet.Button] = []
+        
+        // Kick option
+        if myRole.canKick(member.role) {
+            buttons.append(.destructive(Text("Kick from Group")) {
+                showingKickConfirmation = true
+            })
+        }
+        
+        // Ban option
+        if myRole.canBan(member.role) {
+            buttons.append(.destructive(Text("Ban from Group")) {
+                showingBanConfirmation = true
+            })
+        }
+        
+        // Promote/Demote options (only for owners)
+        if myRole.canPromote(member.role) {
+            if member.role == .member {
+                buttons.append(.default(Text("Promote to Admin")) {
+                    pendingAction = {
+                        dataManager.promoteMember(group.id, userId: member.id, newRole: .admin)
+                    }
+                    showingPromoteConfirmation = true
+                })
+            } else if member.role == .admin {
+                buttons.append(.default(Text("Demote to Member")) {
+                    pendingAction = {
+                        dataManager.demoteMember(group.id, userId: member.id)
+                    }
+                    showingPromoteConfirmation = true
+                })
+            }
+        }
+        
+        buttons.append(.cancel())
+        
+        return ActionSheet(
+            title: Text(member.username),
+            message: Text("Choose an action"),
+            buttons: buttons
+        )
+    }
+    
+    private var bannedUsersView: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                if dataManager.isLoadingBannedUsers {
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                            .progressViewStyle(CircularProgressViewStyle(tint: accentColor))
+                        
+                        Text("Loading banned users...")
+                            .font(.system(size: 16))
+                            .foregroundColor(.gray)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black)
+                } else if dataManager.bannedUsers.isEmpty {
+                    VStack(spacing: 20) {
+                        Image(systemName: "person.slash")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                        
+                        Text("No Banned Users")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text("Users who are banned from the group will appear here.")
+                            .font(.system(size: 16))
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black)
+                } else {
+                    List {
+                        ForEach(dataManager.bannedUsers) { bannedUser in
+                            bannedUserRowView(bannedUser)
+                        }
+                    }
+                    .listStyle(PlainListStyle())
+                    .background(Color.black)
+                }
+            }
+            .navigationTitle("Banned Users")
+            .navigationBarTitleDisplayMode(.inline)
+            .background(Color.black)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        showingBannedUsers = false
+                    }
+                }
+            }
+        }
+    }
+    
+    private func bannedUserRowView(_ bannedUser: BannedUser) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                // Avatar
+                AsyncImage(url: URL(string: bannedUser.profileImageUrl ?? "")) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Circle()
+                        .fill(LinearGradient(
+                            gradient: Gradient(colors: [Color.red.opacity(0.6), Color.red.opacity(0.3)]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .overlay(
+                            Text(String(bannedUser.username.prefix(1)).uppercased())
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                }
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(bannedUser.username)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                        
+                        if bannedUser.isActive {
+                            Text("BANNED")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.red)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color.red.opacity(0.2))
+                                )
+                        } else {
+                            Text("UNBANNED")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.green)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color.green.opacity(0.2))
+                                )
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Banned by \(bannedUser.bannedByUsername)")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                        
+                        if let reason = bannedUser.banReason {
+                            Text("Reason: \(reason)")
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Text("Banned \(formatDate(bannedUser.createdAt))")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                    }
+                }
+                
+                Spacer()
+                
+                // Unban button (only for active bans and if user has permission)
+                if bannedUser.isActive,
+                   let group = dataManager.selectedGroup ?? dataManager.userGroups.first,
+                   let myRole = group.myRole,
+                   myRole.canBanMembers {
+                    
+                    Button("Unban") {
+                        dataManager.unbanMember(group.id, userId: bannedUser.userId)
+                    }
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.green)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.green.opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+    
+    private func resetActionState() {
+        selectedMemberForAction = nil
+        reasonText = ""
+        pendingAction = nil
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 

@@ -21,6 +21,8 @@ struct Group: Identifiable, Codable, Equatable {
     let memberLimit: Int
     let avatarColor: String
     let emoji: String
+    let region: String
+    let points: Int
     let createdAt: Date
     let updatedAt: Date
     let creatorUsername: String?
@@ -37,7 +39,7 @@ struct Group: Identifiable, Codable, Equatable {
         case isPrivate = "is_private"
         case memberLimit = "member_limit"
         case avatarColor = "avatar_color"
-        case emoji
+        case emoji, region, points
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case creatorUsername = "creator_username"
@@ -70,6 +72,17 @@ struct Group: Identifiable, Codable, Equatable {
         memberLimit = try container.decode(Int.self, forKey: .memberLimit)
         avatarColor = try container.decode(String.self, forKey: .avatarColor)
         emoji = try container.decode(String.self, forKey: .emoji)
+        region = try container.decodeIfPresent(String.self, forKey: .region) ?? "Unknown"
+        
+        // Handle points - can be Int or String
+        if let intValue = try? container.decode(Int.self, forKey: .points) {
+            points = intValue
+        } else if let stringValue = try? container.decode(String.self, forKey: .points),
+                  let intValue = Int(stringValue) {
+            points = intValue
+        } else {
+            points = 0
+        }
         
         // Handle memberCount - can be Int or String
         if let intValue = try? container.decode(Int.self, forKey: .memberCount) {
@@ -137,6 +150,8 @@ struct Group: Identifiable, Codable, Equatable {
         try container.encode(memberLimit, forKey: .memberLimit)
         try container.encode(avatarColor, forKey: .avatarColor)
         try container.encode(emoji, forKey: .emoji)
+        try container.encode(region, forKey: .region)
+        try container.encode(points, forKey: .points)
         try container.encode(memberCount, forKey: .memberCount)
         try container.encodeIfPresent(creatorUsername, forKey: .creatorUsername)
         try container.encodeIfPresent(myRole?.rawValue, forKey: .myRole)
@@ -182,6 +197,52 @@ enum GroupRole: String, CaseIterable, Codable {
     
     var canInviteMembers: Bool {
         return self != .member
+    }
+    
+    var canKickMembers: Bool {
+        return self == .owner || self == .admin
+    }
+    
+    var canBanMembers: Bool {
+        return self == .owner || self == .admin
+    }
+    
+    var canDeleteGroup: Bool {
+        return self == .owner
+    }
+    
+    var canPromoteMembers: Bool {
+        return self == .owner
+    }
+    
+    var canViewBannedUsers: Bool {
+        return self == .owner || self == .admin
+    }
+    
+    func canKick(_ targetRole: GroupRole) -> Bool {
+        switch self {
+        case .owner:
+            return targetRole != .owner
+        case .admin:
+            return targetRole == .member
+        case .member:
+            return false
+        }
+    }
+    
+    func canBan(_ targetRole: GroupRole) -> Bool {
+        switch self {
+        case .owner:
+            return targetRole != .owner
+        case .admin:
+            return targetRole == .member
+        case .member:
+            return false
+        }
+    }
+    
+    func canPromote(_ targetRole: GroupRole) -> Bool {
+        return self == .owner && targetRole != .owner
     }
 }
 
@@ -332,9 +393,10 @@ struct CreateGroupRequest: Codable {
     let memberLimit: Int
     let avatarColor: String
     let emoji: String
+    let region: String
     
     enum CodingKeys: String, CodingKey {
-        case name, description, emoji
+        case name, description, emoji, region
         case isPrivate = "is_private"
         case memberLimit = "member_limit"
         case avatarColor = "avatar_color"
@@ -400,4 +462,228 @@ struct GroupMessagesResponse: Codable {
 struct MessageResponse: Codable {
     let success: Bool
     let message: GroupMessage
-} 
+}
+
+// MARK: - Group Management Models
+
+struct BannedUser: Identifiable, Codable {
+    let id: Int
+    let uuid: String?
+    let groupId: Int
+    let userId: Int
+    let bannedBy: Int
+    let banReason: String?
+    let banType: String
+    let isPermanent: Bool
+    let expiresAt: Date?
+    let createdAt: Date
+    let unbannedAt: Date?
+    let unbannedBy: Int?
+    let username: String
+    let profileImageUrl: String?
+    let bannedByUsername: String
+    let unbannedByUsername: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, uuid, username
+        case groupId = "group_id"
+        case userId = "user_id"
+        case bannedBy = "banned_by"
+        case banReason = "ban_reason"
+        case banType = "ban_type"
+        case isPermanent = "is_permanent"
+        case expiresAt = "expires_at"
+        case createdAt = "created_at"
+        case unbannedAt = "unbanned_at"
+        case unbannedBy = "unbanned_by"
+        case profileImageUrl = "profile_image_url"
+        case bannedByUsername = "banned_by_username"
+        case unbannedByUsername = "unbanned_by_username"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(Int.self, forKey: .id)
+        uuid = try container.decodeIfPresent(String.self, forKey: .uuid)
+        groupId = try container.decode(Int.self, forKey: .groupId)
+        userId = try container.decode(Int.self, forKey: .userId)
+        bannedBy = try container.decode(Int.self, forKey: .bannedBy)
+        banReason = try container.decodeIfPresent(String.self, forKey: .banReason)
+        banType = try container.decode(String.self, forKey: .banType)
+        username = try container.decode(String.self, forKey: .username)
+        profileImageUrl = try container.decodeIfPresent(String.self, forKey: .profileImageUrl)
+        bannedByUsername = try container.decode(String.self, forKey: .bannedByUsername)
+        unbannedByUsername = try container.decodeIfPresent(String.self, forKey: .unbannedByUsername)
+        
+        // Handle isPermanent - can be Bool or Int
+        if let boolValue = try? container.decode(Bool.self, forKey: .isPermanent) {
+            isPermanent = boolValue
+        } else if let intValue = try? container.decode(Int.self, forKey: .isPermanent) {
+            isPermanent = intValue != 0
+        } else {
+            isPermanent = false
+        }
+        
+        unbannedBy = try container.decodeIfPresent(Int.self, forKey: .unbannedBy)
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        
+        let createdAtString = try container.decode(String.self, forKey: .createdAt)
+        createdAt = dateFormatter.date(from: createdAtString) ?? Date()
+        
+        if let expiresAtString = try container.decodeIfPresent(String.self, forKey: .expiresAt) {
+            expiresAt = dateFormatter.date(from: expiresAtString)
+        } else {
+            expiresAt = nil
+        }
+        
+        if let unbannedAtString = try container.decodeIfPresent(String.self, forKey: .unbannedAt) {
+            unbannedAt = dateFormatter.date(from: unbannedAtString)
+        } else {
+            unbannedAt = nil
+        }
+    }
+    
+    var isActive: Bool {
+        return unbannedAt == nil && (expiresAt == nil || expiresAt! > Date())
+    }
+}
+
+struct AdminAction: Identifiable, Codable {
+    let id: Int
+    let uuid: String?
+    let groupId: Int
+    let adminId: Int
+    let targetUserId: Int?
+    let actionType: String
+    let reason: String?
+    let createdAt: Date
+    
+    enum CodingKeys: String, CodingKey {
+        case id, uuid, reason
+        case groupId = "group_id"
+        case adminId = "admin_id"
+        case targetUserId = "target_user_id"
+        case actionType = "action_type"
+        case createdAt = "created_at"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(Int.self, forKey: .id)
+        uuid = try container.decodeIfPresent(String.self, forKey: .uuid)
+        groupId = try container.decode(Int.self, forKey: .groupId)
+        adminId = try container.decode(Int.self, forKey: .adminId)
+        targetUserId = try container.decodeIfPresent(Int.self, forKey: .targetUserId)
+        actionType = try container.decode(String.self, forKey: .actionType)
+        reason = try container.decodeIfPresent(String.self, forKey: .reason)
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        
+        let createdAtString = try container.decode(String.self, forKey: .createdAt)
+        createdAt = dateFormatter.date(from: createdAtString) ?? Date()
+    }
+}
+
+// MARK: - Group Management Request Models
+
+struct KickMemberRequest: Codable {
+    let userId: Int
+    let reason: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case reason
+        case userId = "user_id"
+    }
+}
+
+struct BanMemberRequest: Codable {
+    let userId: Int
+    let reason: String?
+    let isPermanent: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case reason
+        case userId = "user_id"
+        case isPermanent = "is_permanent"
+    }
+}
+
+struct UnbanMemberRequest: Codable {
+    let userId: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+    }
+}
+
+struct PromoteMemberRequest: Codable {
+    let userId: Int
+    let newRole: String
+    
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case newRole = "new_role"
+    }
+}
+
+struct CheckBanRequest: Codable {
+    let inviteCode: String
+    
+    enum CodingKeys: String, CodingKey {
+        case inviteCode = "invite_code"
+    }
+}
+
+// MARK: - Group Management Response Models
+
+struct BannedUsersResponse: Codable {
+    let success: Bool
+    let bannedUsers: [BannedUser]
+    
+    enum CodingKeys: String, CodingKey {
+        case success
+        case bannedUsers = "banned_users"
+    }
+}
+
+struct CheckBanResponse: Codable {
+    let success: Bool
+    let canJoin: Bool?
+    let error: String?
+    let banReason: String?
+    let bannedAt: Date?
+    
+    enum CodingKeys: String, CodingKey {
+        case success, error
+        case canJoin = "can_join"
+        case banReason = "ban_reason"
+        case bannedAt = "banned_at"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        success = try container.decode(Bool.self, forKey: .success)
+        canJoin = try container.decodeIfPresent(Bool.self, forKey: .canJoin)
+        error = try container.decodeIfPresent(String.self, forKey: .error)
+        banReason = try container.decodeIfPresent(String.self, forKey: .banReason)
+        
+        if let bannedAtString = try container.decodeIfPresent(String.self, forKey: .bannedAt) {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            bannedAt = dateFormatter.date(from: bannedAtString)
+        } else {
+            bannedAt = nil
+        }
+    }
+}
+
+ 

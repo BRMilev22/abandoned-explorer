@@ -510,5 +510,5 @@ struct VisitResponse: Codable {
 // Additional API response types
 struct APISuccessResponse: Codable {
     let success: Bool
-    let message: String
+    let message: String?
 }

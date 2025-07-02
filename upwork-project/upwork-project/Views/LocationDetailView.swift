@@ -52,7 +52,7 @@ struct LocationDetailView: View {
                     // Image Carousel
                     if !location.displayImages.isEmpty {
                         ImageCarousel(images: location.displayImages, selectedIndex: $selectedImageIndex)
-                            .frame(height: 250)
+                            .frame(height: 180)
                             .onTapGesture {
                                 showFullImage = true
                             }

@@ -70,6 +70,11 @@ class DataManager: ObservableObject {
     @Published var isCreatingGroup = false
     @Published var isJoiningGroup = false
     @Published var isSendingMessage = false
+    @Published var wasRemovedFromGroup = false
+    @Published var removalReason: String?
+    
+    // Group membership monitoring
+    private var membershipCheckTimer: Timer?
     
     let apiService = APIService.shared
     private var cancellables = Set<AnyCancellable>()
@@ -152,6 +157,11 @@ class DataManager: ObservableObject {
                         self?.selectedGroup = nil
                         self?.groupMembers = []
                         self?.groupMessages = []
+                        self?.bannedUsers = []
+                        self?.wasRemovedFromGroup = false
+                        self?.removalReason = nil
+                        // Stop monitoring on logout
+                        self?.stopMembershipMonitoring()
                     }
                 }
             }
@@ -229,6 +239,18 @@ class DataManager: ObservableObject {
         isAdmin = false
         pendingLocations = []
         
+        // Clear group data
+        userGroups = []
+        selectedGroup = nil
+        groupMembers = []
+        groupMessages = []
+        bannedUsers = []
+        wasRemovedFromGroup = false
+        removalReason = nil
+        
+        // Stop monitoring
+        stopMembershipMonitoring()
+        
         // Reset loading states
         isLoadingUser = false
         isLoadingBookmarks = false
@@ -255,8 +277,11 @@ class DataManager: ObservableObject {
                     }
                 },
                 receiveValue: { [weak self] user in
-                    print("DataManager: Current user loaded successfully")
+                    print("DataManager: Current user loaded successfully with region: \(user.region)")
                     self?.currentUser = user
+                    
+                    // Check region on startup
+                    self?.checkRegionOnStartup()
                 }
             )
             .store(in: &cancellables)
@@ -889,12 +914,12 @@ class DataManager: ObservableObject {
         apiService.approveLocation(locationId)
             .receive(on: DispatchQueue.main)
             .sink(
-                receiveCompletion: { [weak self] completion in
+                receiveCompletion: { [weak self] (completion: Subscribers.Completion<APIError>) in
                     if case .failure(let error) = completion {
                         self?.errorMessage = error.localizedDescription
                     }
                 },
-                receiveValue: { [weak self] response in
+                receiveValue: { [weak self] (response: AdminActionResponse) in
                     // Remove from pending locations
                     self?.pendingLocations.removeAll { $0.id == locationId }
                     // Refresh all locations to show the approved location
@@ -915,12 +940,12 @@ class DataManager: ObservableObject {
         apiService.rejectLocation(locationId)
             .receive(on: DispatchQueue.main)
             .sink(
-                receiveCompletion: { [weak self] completion in
+                receiveCompletion: { [weak self] (completion: Subscribers.Completion<APIError>) in
                     if case .failure(let error) = completion {
                         self?.errorMessage = error.localizedDescription
                     }
                 },
-                receiveValue: { [weak self] response in
+                receiveValue: { [weak self] (response: AdminActionResponse) in
                     // Remove from pending locations
                     self?.pendingLocations.removeAll { $0.id == locationId }
                 }
@@ -1594,6 +1619,10 @@ class DataManager: ObservableObject {
     
     // MARK: - Groups Management
     
+    @Published var bannedUsers: [BannedUser] = []
+    @Published var isLoadingBannedUsers = false
+    @Published var isPerformingAdminAction = false
+    
     func loadUserGroups() {
         guard isAuthenticated, !isLoadingGroups else { return }
         
@@ -1625,13 +1654,17 @@ class DataManager: ObservableObject {
         errorMessage = nil
         print("👥 Creating group: \(name)")
         
+        // Get region from current user, default to Unknown if not set
+        let userRegion = currentUser?.region ?? "Unknown"
+        
         let request = CreateGroupRequest(
             name: name,
             description: description,
             isPrivate: isPrivate,
             memberLimit: memberLimit,
             avatarColor: avatarColor,
-            emoji: emoji
+            emoji: emoji,
+            region: userRegion
         )
         
         apiService.createGroup(request)
@@ -1698,7 +1731,7 @@ class DataManager: ObservableObject {
                     self?.isLoadingGroupMembers = false
                     if case .failure(let error) = completion {
                         print("❌ Failed to load group members: \(error.localizedDescription)")
-                        self?.errorMessage = error.localizedDescription
+                        self?.handleGroupAPIError(error, groupId: groupId)
                     }
                 },
                 receiveValue: { [weak self] response in
@@ -1722,7 +1755,7 @@ class DataManager: ObservableObject {
                     self?.isLoadingGroupMessages = false
                     if case .failure(let error) = completion {
                         print("❌ Failed to load group messages: \(error.localizedDescription)")
-                        self?.errorMessage = error.localizedDescription
+                        self?.handleGroupAPIError(error, groupId: groupId)
                     }
                 },
                 receiveValue: { [weak self] response in
@@ -1759,7 +1792,7 @@ class DataManager: ObservableObject {
                     self?.isSendingMessage = false
                     if case .failure(let error) = completion {
                         print("❌ Failed to send message: \(error.localizedDescription)")
-                        self?.errorMessage = error.localizedDescription
+                        self?.handleGroupAPIError(error, groupId: groupId)
                     }
                 },
                 receiveValue: { [weak self] response in
@@ -1770,6 +1803,11 @@ class DataManager: ObservableObject {
                     
                     // Update member activity when sending a message
                     self?.updateMemberActivity(groupId)
+                    
+                    // Trigger immediate membership check to catch any recent removals
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self?.checkMembershipStatus(for: groupId)
+                    }
                 }
             )
             .store(in: &cancellables)
@@ -1798,6 +1836,7 @@ class DataManager: ObservableObject {
                         self?.selectedGroup = nil
                         self?.groupMembers = []
                         self?.groupMessages = []
+                        self?.bannedUsers = []
                     }
                 }
             )
@@ -1838,15 +1877,28 @@ class DataManager: ObservableObject {
         // Clear existing data
         groupMembers = []
         groupMessages = []
+        bannedUsers = []
+        wasRemovedFromGroup = false
+        removalReason = nil
         // Load group data
         loadGroupMembers(group.id)
         loadGroupMessages(group.id)
+        if canViewBannedUsers() {
+            loadBannedUsers(group.id)
+        }
+        // Start monitoring membership
+        startMembershipMonitoring(for: group.id)
     }
     
     func clearGroupSelection() {
         selectedGroup = nil
         groupMembers = []
         groupMessages = []
+        bannedUsers = []
+        wasRemovedFromGroup = false
+        removalReason = nil
+        // Stop monitoring
+        stopMembershipMonitoring()
     }
     
     func updateMemberActivity(_ groupId: Int) {
@@ -1855,9 +1907,10 @@ class DataManager: ObservableObject {
         apiService.updateMemberActivity(groupId)
             .receive(on: DispatchQueue.main)
             .sink(
-                receiveCompletion: { completion in
+                receiveCompletion: { [weak self] completion in
                     if case .failure(let error) = completion {
                         print("❌ Failed to update member activity: \(error.localizedDescription)")
+                        self?.handleGroupAPIError(error, groupId: groupId)
                     }
                 },
                 receiveValue: { response in
@@ -1865,6 +1918,235 @@ class DataManager: ObservableObject {
                 }
             )
             .store(in: &cancellables)
+    }
+    
+    // MARK: - Group Management
+    
+    func kickMember(_ groupId: Int, userId: Int, reason: String?) {
+        guard isAuthenticated, !isPerformingAdminAction else { return }
+        
+        isPerformingAdminAction = true
+        errorMessage = nil
+        print("👥 Kicking member \(userId) from group \(groupId)")
+        
+        apiService.kickMember(groupId, userId: userId, reason: reason)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] (completion: Subscribers.Completion<APIError>) in
+                    self?.isPerformingAdminAction = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to kick member: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] (response: AdminActionResponse) in
+                    print("✅ Member kicked successfully: \(response.message)")
+                    // Remove from local members list immediately
+                    self?.groupMembers.removeAll { $0.id == userId }
+                    // Reload messages to show system message
+                    self?.loadGroupMessages(groupId)
+                    // Refresh group data to update member count
+                    self?.loadUserGroups()
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func banMember(_ groupId: Int, userId: Int, reason: String?, isPermanent: Bool = true) {
+        guard isAuthenticated, !isPerformingAdminAction else { return }
+        
+        isPerformingAdminAction = true
+        errorMessage = nil
+        print("🚫 Banning member \(userId) from group \(groupId)")
+        
+        apiService.banMember(groupId, userId: userId, reason: reason, isPermanent: isPermanent)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] (completion: Subscribers.Completion<APIError>) in
+                    self?.isPerformingAdminAction = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to ban member: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] (response: AdminActionResponse) in
+                    print("✅ Member banned successfully: \(response.message)")
+                    // Remove from local members list immediately
+                    self?.groupMembers.removeAll { $0.id == userId }
+                    // Reload banned users list
+                    self?.loadBannedUsers(groupId)
+                    // Reload messages to show system message
+                    self?.loadGroupMessages(groupId)
+                    // Refresh group data to update member count
+                    self?.loadUserGroups()
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func unbanMember(_ groupId: Int, userId: Int) {
+        guard isAuthenticated, !isPerformingAdminAction else { return }
+        
+        isPerformingAdminAction = true
+        errorMessage = nil
+        print("✅ Unbanning member \(userId) from group \(groupId)")
+        
+        apiService.unbanMember(groupId, userId: userId)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] (completion: Subscribers.Completion<APIError>) in
+                    self?.isPerformingAdminAction = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to unban member: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] (response: AdminActionResponse) in
+                    print("✅ Member unbanned successfully: \(response.message)")
+                    // Reload banned users list
+                    self?.loadBannedUsers(groupId)
+                    // Reload messages to show system message
+                    self?.loadGroupMessages(groupId)
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func loadBannedUsers(_ groupId: Int) {
+        guard isAuthenticated, !isLoadingBannedUsers else { return }
+        
+        isLoadingBannedUsers = true
+        print("🚫 Loading banned users for group \(groupId)")
+        
+        apiService.getBannedUsers(groupId)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] (completion: Subscribers.Completion<APIError>) in
+                    self?.isLoadingBannedUsers = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to load banned users: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] (response: BannedUsersResponse) in
+                    print("✅ Banned users loaded: \(response.bannedUsers.count) users")
+                    self?.bannedUsers = response.bannedUsers
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func deleteGroup(_ groupId: Int) {
+        guard isAuthenticated, !isPerformingAdminAction else { return }
+        
+        isPerformingAdminAction = true
+        errorMessage = nil
+        print("🗑️ Deleting group \(groupId)")
+        
+        apiService.deleteGroup(groupId)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] (completion: Subscribers.Completion<APIError>) in
+                    self?.isPerformingAdminAction = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to delete group: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] (response: AdminActionResponse) in
+                    print("✅ Group deleted successfully: \(response.message)")
+                    // Remove from local groups
+                    self?.userGroups.removeAll { $0.id == groupId }
+                    // Clear selection if this was the selected group
+                    if self?.selectedGroup?.id == groupId {
+                        self?.selectedGroup = nil
+                        self?.groupMembers = []
+                        self?.groupMessages = []
+                        self?.bannedUsers = []
+                    }
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func promoteMember(_ groupId: Int, userId: Int, newRole: GroupRole) {
+        guard isAuthenticated, !isPerformingAdminAction else { return }
+        
+        isPerformingAdminAction = true
+        errorMessage = nil
+        print("⬆️ Promoting member \(userId) to \(newRole.rawValue) in group \(groupId)")
+        
+        apiService.promoteMember(groupId, userId: userId, newRole: newRole)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] (completion: Subscribers.Completion<APIError>) in
+                    self?.isPerformingAdminAction = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to promote member: \(error.localizedDescription)")
+                        self?.errorMessage = error.localizedDescription
+                    }
+                },
+                receiveValue: { [weak self] (response: AdminActionResponse) in
+                    print("✅ Member promoted successfully: \(response.message)")
+                    // Reload members to get updated roles (immediate update)
+                    self?.loadGroupMembers(groupId)
+                    // Reload messages to show system message
+                    self?.loadGroupMessages(groupId)
+                    // Refresh group data in case role distribution affects group display
+                    self?.loadUserGroups()
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func demoteMember(_ groupId: Int, userId: Int) {
+        promoteMember(groupId, userId: userId, newRole: .member)
+    }
+    
+    func checkBanStatus(inviteCode: String, completion: @escaping (Result<CheckBanResponse, APIError>) -> Void) {
+        print("🚫 Checking ban status for invite code: \(inviteCode)")
+        
+        apiService.checkBanStatus(inviteCode: inviteCode)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { (checkCompletion: Subscribers.Completion<APIError>) in
+                    if case .failure(let error) = checkCompletion {
+                        print("❌ Failed to check ban status: \(error.localizedDescription)")
+                        completion(.failure(error))
+                    }
+                },
+                receiveValue: { (response: CheckBanResponse) in
+                    print("✅ Ban status checked")
+                    completion(.success(response))
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    // Helper methods for group management UI
+    func canKickMember(_ memberRole: GroupRole) -> Bool {
+        guard let myRole = selectedGroup?.myRole else { return false }
+        return myRole.canKick(memberRole)
+    }
+    
+    func canBanMember(_ memberRole: GroupRole) -> Bool {
+        guard let myRole = selectedGroup?.myRole else { return false }
+        return myRole.canBan(memberRole)
+    }
+    
+    func canPromoteMember(_ memberRole: GroupRole) -> Bool {
+        guard let myRole = selectedGroup?.myRole else { return false }
+        return myRole.canPromote(memberRole)
+    }
+    
+    func canDeleteGroup() -> Bool {
+        guard let myRole = selectedGroup?.myRole else { return false }
+        return myRole.canDeleteGroup
+    }
+    
+    func canViewBannedUsers() -> Bool {
+        guard let myRole = selectedGroup?.myRole else { return false }
+        return myRole.canViewBannedUsers
     }
     
     func likeGroupMessage(_ groupId: Int, messageId: Int) {
@@ -1878,7 +2160,7 @@ class DataManager: ObservableObject {
                 receiveCompletion: { [weak self] completion in
                     if case .failure(let error) = completion {
                         print("❌ Failed to like message: \(error.localizedDescription)")
-                        self?.errorMessage = error.localizedDescription
+                        self?.handleGroupAPIError(error, groupId: groupId)
                     }
                 },
                 receiveValue: { [weak self] response in
@@ -1889,4 +2171,180 @@ class DataManager: ObservableObject {
             )
             .store(in: &cancellables)
     }
+    
+    // MARK: - Group Membership Monitoring
+    
+    private func startMembershipMonitoring(for groupId: Int) {
+        stopMembershipMonitoring() // Stop any existing timer
+        
+        // Check membership every 10 seconds when viewing a group (more frequent for immediate detection)
+        membershipCheckTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+            self?.checkMembershipStatus(for: groupId)
+        }
+        
+        print("👀 Started membership monitoring for group \(groupId)")
+    }
+    
+    private func stopMembershipMonitoring() {
+        membershipCheckTimer?.invalidate()
+        membershipCheckTimer = nil
+        print("🛑 Stopped membership monitoring")
+    }
+    
+    private func checkMembershipStatus(for groupId: Int) {
+        guard isAuthenticated, selectedGroup?.id == groupId else { return }
+        
+        // Try to load group members - if we get an error, we're likely no longer a member
+        apiService.getGroupMembers(groupId)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    if case .failure(let error) = completion {
+                        print("🔍 Membership check failed: \(error.localizedDescription)")
+                        self?.handleGroupAPIError(error, groupId: groupId)
+                    }
+                },
+                receiveValue: { [weak self] response in
+                    // Check if current user is still in the members list
+                    if let currentUserId = self?.currentUser?.id {
+                        let stillMember = response.members.contains { $0.id == currentUserId }
+                        if !stillMember {
+                            print("❌ Current user no longer found in members list")
+                            self?.handleGroupRemoval(groupId: groupId, reason: "You are no longer a member of this group")
+                        }
+                    }
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    private func handleGroupAPIError(_ error: APIError, groupId: Int) {
+        // Check if error indicates we're no longer a member
+        switch error {
+        case .serverError(let errorType, let message):
+            if errorType.contains("not_member") || errorType.contains("access_denied") || 
+               message?.contains("not a member") == true || message?.contains("banned") == true ||
+               message?.contains("kicked") == true {
+                let reason = message ?? "You have been removed from this group"
+                handleGroupRemoval(groupId: groupId, reason: reason)
+                return
+            }
+        case .unauthorized:
+            // Could also indicate group access issues
+            handleGroupRemoval(groupId: groupId, reason: "Access denied - you may have been removed from this group")
+            return
+        default:
+            break
+        }
+        
+        // If not a membership error, handle normally
+        self.errorMessage = error.localizedDescription
+    }
+    
+    private func handleGroupRemoval(groupId: Int, reason: String) {
+        print("🚨 User removed from group \(groupId): \(reason)")
+        
+        // Update UI state
+        wasRemovedFromGroup = true
+        removalReason = reason
+        
+        // Remove group from local data
+        userGroups.removeAll { $0.id == groupId }
+        
+        // Clear selection if this was the selected group
+        if selectedGroup?.id == groupId {
+            clearGroupSelection()
+        }
+        
+        // Stop monitoring
+        stopMembershipMonitoring()
+        
+        // Show notification
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Reset the flag after showing notification
+            self.wasRemovedFromGroup = false
+            self.removalReason = nil
+        }
+    }
+    
+    // MARK: - User Region Management
+    
+
+    func updateUserRegion(_ region: String) {
+        guard isAuthenticated else { return }
+        
+        // Update local user object
+        if var user = currentUser {
+            user.region = region
+            currentUser = user
+        }
+        
+        // Update in database
+        APIService.shared.updateUserRegion(region: region)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to update user region: \(error)")
+                    }
+                },
+                receiveValue: { success in
+                    if success {
+                        print("✅ User region updated to: \(region)")
+                    }
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func checkRegionOnStartup() {
+        // Check region when app starts and location is available
+        guard isAuthenticated, let user = currentUser else { 
+            print("🌍 Cannot check region on startup - user not authenticated or loaded")
+            return 
+        }
+        
+        // Get current location from MapView/LocationManager when available
+        // This will be called from MapView when location becomes available
+        print("🌍 Ready to check region on startup for user with current region: \(user.region)")
+    }
+    
+    func checkAndUpdateUserRegion(location: CLLocationCoordinate2D) {
+        // Always check and update region when location is detected
+        guard isAuthenticated, let user = currentUser else { 
+            return 
+        }
+        
+        let detectedRegion = detectRegionFromLocation(location)
+        if detectedRegion != "Unknown" && detectedRegion != user.region {
+            print("🌍 Region changed from '\(user.region)' to '\(detectedRegion)' - updating user region")
+            updateUserRegion(detectedRegion)
+        } else if detectedRegion != "Unknown" && detectedRegion == user.region {
+            print("🌍 Region confirmed as '\(detectedRegion)' (no change needed)")
+        }
+    }
+    
+    private func detectRegionFromLocation(_ location: CLLocationCoordinate2D) -> String {
+        let lat = location.latitude
+        let lng = location.longitude
+        
+        // Don't update for invalid coordinates
+        guard lat != 0.0 && lng != 0.0 else { return "Unknown" }
+        
+        // Region detection based on coordinates
+        if lat >= 35.0 && lat <= 72.0 && lng >= -25.0 && lng <= 45.0 {
+            return "EU"  // Europe
+        } else if lat >= 25.0 && lat <= 49.0 && lng >= -125.0 && lng <= -66.0 {
+            return "US"  // United States
+        } else if lat >= -55.0 && lat <= 35.0 && lng >= -180.0 && lng <= -35.0 {
+            return "AMERICAS"  // Americas (excluding US)
+        } else if lat >= -50.0 && lat <= 50.0 && lng >= 25.0 && lng <= 180.0 {
+            return "ASIA"  // Asia and Oceania
+        } else if lat >= -35.0 && lat <= 37.0 && lng >= -20.0 && lng <= 55.0 {
+            return "AFRICA"  // Africa
+        } else {
+            return "Unknown"
+        }
+    }
+
 }

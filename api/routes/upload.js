@@ -87,7 +87,7 @@ router.post('/images', [
   authenticateToken,
   requirePremium,
   upload.array('images', 5),
-  body('location_id').isUUID()
+  body('location_id').isNumeric()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -236,7 +236,7 @@ router.post('/videos', [
   authenticateToken,
   requirePremium,
   uploadVideo.array('videos', 3),
-  body('location_id').isUUID()
+  body('location_id').isNumeric()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
