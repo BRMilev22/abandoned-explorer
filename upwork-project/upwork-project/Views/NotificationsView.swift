@@ -313,6 +313,11 @@ struct NotificationsView: View {
                 navigateToLocation(locationId: relatedId)
             }
             
+        case .groupJoin, .groupLeave, .groupInvite, .groupKick, .groupBan, .groupMessage, .groupPromotion, .groupDemotion:
+            // Group-related notifications - could navigate to group view in the future
+            isNavigating = false
+            print("ℹ️ Group notification received: \(notification.type.rawValue)")
+            
         case .follow, .mention, .system:
             // These might not have direct navigation
             isNavigating = false

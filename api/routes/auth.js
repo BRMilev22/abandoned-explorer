@@ -274,7 +274,7 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     const [users] = await pool.execute(
       `SELECT 
-        u.id, u.username, u.email, u.age, u.is_premium, u.profile_image_url, u.created_at,
+        u.id, u.username, u.email, u.age, u.is_premium, u.profile_image_url, u.region, u.created_at,
         COUNT(DISTINCT l.id) as submitted_locations,
         COUNT(DISTINCT CASE WHEN l.is_approved = TRUE THEN l.id END) as approved_locations,
         COUNT(DISTINCT b.id) as bookmarked_locations,

@@ -32,26 +32,16 @@ struct MainTabView: View {
                 .environmentObject(locationManager)
                 .tabItem {
                     Image(systemName: "exclamationmark.triangle.fill")
-                    Text("Alert Community")
+                    Text("Alert")
                 }
                 .tag(1)
-            
-            NewsView()
-                .tabItem {
-                    Image(systemName: "newspaper")
-                    Text("News")
-                }
-                .if(dataManager.unreadNotificationCount > 0) { view in
-                    view.badge(dataManager.unreadNotificationCount)
-                }
-                .tag(2)
             
             SubmitLocationView()
                 .tabItem {
                     Image(systemName: "plus")
                     Text("Submit")
                 }
-                .tag(3)
+                .tag(2)
         }
         .environmentObject(dataManager)
         .environmentObject(locationManager)

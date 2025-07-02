@@ -18,11 +18,13 @@ struct MapView: View {
     @State private var showLocationDetail = false
     @State private var lastLocationUpdate = Date()
     @State private var showingLocationSelector = false
-    @State private var selectedLocationCategory = "Social Map"
+    @State private var selectedLocationCategory = "Outpost"
     @State private var showingProfile = false
     @State private var showingKeyAlerts = false
     @State private var showingGroups = false
     @State private var showingNotifications = false
+    @State private var showingCreateGroup = false
+    @State private var showingJoinGroup = false
 
     @State private var currentZoomLevel: Double = 14.0
     @State private var currentMapCenter: CLLocationCoordinate2D?
@@ -68,24 +70,24 @@ struct MapView: View {
         // return dataManager.getApprovedLocations().filter { $0.isVerifiedAbandoned == true }
     }
     
-    // Computed property for content view to simplify body
+    // Computed property for content view to support category switching
     @ViewBuilder
     private var contentView: some View {
         switch selectedLocationCategory {
-        case "Social Map":
-            socialMapView
+        case "Outpost":
+            outpostMapView
         case "Verified Map":
             verifiedMapView
         case "Social Feed":
             socialFeedView
         default:
-            defaultMapView
+            outpostMapView
         }
     }
     
     // Individual view components
     @ViewBuilder
-    private var socialMapView: some View {
+    private var outpostMapView: some View {
         MapboxMapView(
             accessToken: accessToken,
             styleURI: customStyleURL,
@@ -144,31 +146,6 @@ struct MapView: View {
             .environmentObject(locationManager)
     }
     
-    @ViewBuilder
-    private var defaultMapView: some View {
-        MapboxMapView(
-            accessToken: accessToken,
-            styleURI: customStyleURL,
-            locations: dataManager.getApprovedLocations(),
-            activeUsers: [],
-            userLocation: locationManager.userLocation,
-            onLocationTap: { location in
-                selectedLocation = location
-                showLocationDetail = true
-            },
-            onZoomChange: { zoomLevel in
-                currentZoomLevel = zoomLevel
-                handleZoomBasedLocationLoading(zoomLevel: zoomLevel)
-            },
-            onMapCenterChange: { center in
-                currentMapCenter = center
-                geocodingService.reverseGeocode(coordinate: center, zoomLevel: currentZoomLevel)
-                loadActiveUsers()
-                checkAndLoadLocationsForNewArea(center: center)
-            }
-        )
-    }
-    
     var body: some View {
         ZStack {
             // Background
@@ -178,9 +155,19 @@ struct MapView: View {
             contentView
                 .ignoresSafeArea()
             
-            // Header Overlay
+            // Radar effect overlay on user location
+            if let userLocation = locationManager.userLocation {
+                RadarEffectView()
+                    .position(
+                        x: UIScreen.main.bounds.width / 2,
+                        y: UIScreen.main.bounds.height / 2
+                    )
+                    .allowsHitTesting(false) // Allow map interaction through the radar
+            }
+            
+            // Header Overlay - Updated to use new OutpostHeaderView
             VStack {
-                MapHeaderView(
+                OutpostHeaderView(
                     selectedCategory: $selectedLocationCategory,
                     showingSelector: $showingLocationSelector,
                     showingProfile: $showingProfile,
@@ -197,21 +184,27 @@ struct MapView: View {
                         loadActiveUsers()
                     }
                 )
+                .environmentObject(dataManager)
                 
                 Spacer()
                 
-                // Bottom location info section with zoom-aware visibility
-                ZoomAwareBottomBanner(
-                    locations: dataManager.getApprovedLocations(),
-                    userLocation: locationManager.userLocation,
-                    currentZoomLevel: currentZoomLevel,
+                // Smart Bottom Panel - replaces the old ZoomAwareBottomBanner
+                SmartBottomPanel(
                     currentLocationName: geocodingService.currentLocationName,
+                    currentZoomLevel: currentZoomLevel,
                     onGroupsPressed: {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingGroups = true
                         }
+                    },
+                    onCreateGroupPressed: {
+                        showingCreateGroup = true
+                    },
+                    onJoinGroupPressed: {
+                        showingJoinGroup = true
                     }
                 )
+                .environmentObject(dataManager)
             }
             
             // Loading indicator
@@ -340,6 +333,14 @@ struct MapView: View {
 
         .sheet(isPresented: $showingNotifications) {
             NotificationsView()
+                .environmentObject(dataManager)
+        }
+        .sheet(isPresented: $showingCreateGroup) {
+            CreateGroupView()
+                .environmentObject(dataManager)
+        }
+        .sheet(isPresented: $showingJoinGroup) {
+            JoinGroupView()
                 .environmentObject(dataManager)
         }
         .onAppear {
@@ -1692,152 +1693,7 @@ extension CLLocationCoordinate2D {
     }
 }
 
-// MARK: - Map Header View
-struct MapHeaderView: View {
-    @EnvironmentObject var dataManager: DataManager
-    @Binding var selectedCategory: String
-    @Binding var showingSelector: Bool
-    @Binding var showingProfile: Bool
-    @Binding var showingNotifications: Bool
-    let nearbyUserCount: Int
-    let isGlobalView: Bool
-    let currentLocationName: String
-    let geocodingService: GeocodingService
-    let currentZoomLevel: Double
-    let onRefreshUsers: (() -> Void)? // Add callback for refreshing users
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // Top header with title and buttons
-            HStack {
-                // Location selector button with Citizen-style diamond icon
-                Button(action: {
-                    showingSelector = true
-                }) {
-                    HStack(spacing: 8) {
-                        // Diamond/incidents icon like Citizen
-                        Image(systemName: "diamond.fill")
-                            .font(.title3)
-                            .foregroundColor(.white)
-                        
-                        Text(selectedCategory)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                        
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
-                            .foregroundColor(.white)
-                    }
-                }
-                
-                Spacer()
-                
-                HStack(spacing: 12) {
-                    // Search button in gray circle
-                    Button(action: {
-                        // Search action
-                    }) {
-                        Circle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(width: 44, height: 44)
-                            .overlay(
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(.white)
-                            )
-                    }
-                    
-                    // Notifications button in gray circle with red badge
-                    Button(action: {
-                        showingNotifications = true
-                    }) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.gray.opacity(0.3))
-                                .frame(width: 44, height: 44)
-                                .overlay(
-                                    Image(systemName: "bell.fill")
-                                        .font(.system(size: 18, weight: .medium))
-                                        .foregroundColor(.white)
-                                )
-                            
-                            // Red notification badge with count (dynamic)
-                            if dataManager.unreadNotificationCount > 0 {
-                                Circle()
-                                    .fill(Color.red)
-                                    .frame(width: 20, height: 20)
-                                    .overlay(
-                                        Text("\(min(dataManager.unreadNotificationCount, 999))")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.white)
-                                    )
-                                    .offset(x: 12, y: -12)
-                            }
-                        }
-                    }
-                    
-                    // Profile button in gray circle with green dot (moved from news position)
-                    Button(action: {
-                        showingProfile = true
-                    }) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.gray.opacity(0.3))
-                                .frame(width: 44, height: 44)
-                                .overlay(
-                                    Image(systemName: "person.fill")
-                                        .font(.system(size: 18, weight: .medium))
-                                        .foregroundColor(.white)
-                                )
-                            
-                            // Green online indicator
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 12, height: 12)
-                                .offset(x: 12, y: 12)
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            
-            // User count indicator (centered like in Citizen)
-            VStack(spacing: 4) {
-                // Always show active users count, regardless of zoom level
-                Text("\(formatUserCount(nearbyUserCount)) users")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                
-                Text(geocodingService.getHeaderLocationText(zoomLevel: currentZoomLevel))
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundColor(.gray)
-            }
-            .padding(.top, 20)
-            .onTapGesture {
-                // Allow users to tap the user count to force refresh
-                print("👥 User tapped on user count - forcing refresh")
-                onRefreshUsers?()
-            }
-        }
-        .background(
-            LinearGradient(
-                colors: [Color.black.opacity(0.9), Color.black.opacity(0.7), Color.clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-    }
-    
-    private func formatUserCount(_ count: Int) -> String {
-        if count >= 1000 {
-            let thousands = Double(count) / 1000.0
-            return String(format: "%.1fK", thousands)
-        }
-        return String(count)
-    }
-}
+
 
 // MARK: - Loading Indicator
 struct LoadingIndicator: View {
@@ -1864,217 +1720,9 @@ struct LoadingIndicator: View {
     }
 }
 
-// MARK: - Zoom-Aware Bottom Banner
-struct ZoomAwareBottomBanner: View {
-    let locations: [AbandonedLocation]
-    let userLocation: CLLocationCoordinate2D?
-    let currentZoomLevel: Double
-    let currentLocationName: String
-    let onGroupsPressed: () -> Void
-    
-    @State private var isExpanded = true
-    @State private var dragOffset: CGFloat = 0
-    
-    // Zoom thresholds for banner visibility - hide very early when zooming out
-    private let expandedZoomThreshold: Double = 14.0 // Close to default zoom level
-    private let hiddenZoomThreshold: Double = 13.0   // Hide immediately when zooming out slightly
-    
-    // Calculate recent alerts (last 24 hours)
-    private var recentAlertsCount: Int {
-        let oneDayAgo = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
-        return locations.filter { location in
-            location.submissionDate > oneDayAgo
-        }.count
-    }
-    
-    // Calculate key alerts (dangerous locations)
-    private var keyAlertsCount: Int {
-        return locations.filter { location in
-            location.danger == .dangerous
-        }.count
-    }
-    
-    // Get alert text based on recent activity
-    private var alertText: String {
-        let count = recentAlertsCount
-        if count == 0 {
-            return "0 alerts past 1d"
-        } else if count == 1 {
-            return "1 alert past 1d"
-        } else {
-            return "\(count) alerts past 1d"
-        }
-    }
-    
-    // Determine if banner should be expanded based on zoom level
-    private var shouldExpand: Bool {
-        currentZoomLevel >= expandedZoomThreshold
-    }
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // Pull indicator when collapsed
-            if !isExpanded {
-                Button(action: {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        isExpanded = true
-                    }
-                }) {
-                    VStack(spacing: 4) {
-                        // Pull up indicator
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.gray.opacity(0.6))
-                            .frame(width: 40, height: 4)
-                        
-                        // Chevron up icon
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.black.opacity(0.8), Color.black],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                }
-            }
-            
-            // Main banner content
-            if isExpanded {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(currentLocationName)
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                        
-                        Text(alertText)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                    
-                    Spacer()
-                    
-                    // Groups button with animated outline
-                    AnimatedGroupsButton(action: onGroupsPressed)
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .background(Color.black)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .offset(y: dragOffset)
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    // Only allow downward dragging when expanded
-                    if isExpanded && value.translation.height > 0 {
-                        dragOffset = value.translation.height
-                    }
-                }
-                .onEnded { value in
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        if value.translation.height > 50 && isExpanded {
-                            // Hide banner if dragged down significantly
-                            isExpanded = false
-                        }
-                        dragOffset = 0
-                    }
-                }
-        )
-        .onChange(of: currentZoomLevel) { _, newZoomLevel in
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                if newZoomLevel >= expandedZoomThreshold && !isExpanded {
-                    // Show banner when zooming in to street level
-                    isExpanded = true
-                } else if newZoomLevel <= hiddenZoomThreshold && isExpanded {
-                    // Hide banner when zooming out to state/country level
-                    isExpanded = false
-                }
-            }
-        }
-        .onAppear {
-            // Set initial state based on zoom level
-            isExpanded = shouldExpand
-        }
-    }
-}
 
-// MARK: - Location Category Selector
-struct LocationCategorySelector: View {
-    @Binding var selectedCategory: String
-    @Environment(\.dismiss) private var dismiss
-    
-    private let feedOptions = [
-        ("Social Map", "🗺️", "Social map of all submissions and explorations"),
-        ("Verified Map", "🏚️", "Map of places verified as abandoned"),
-        ("Social Feed", "📋", "Social feed list view of all places")
-    ]
-    
-    var body: some View {
-        NavigationView {
-            List {
-                ForEach(feedOptions, id: \.0) { option in
-                    Button(action: {
-                        selectedCategory = option.0
-                        dismiss()
-                    }) {
-                        HStack(spacing: 16) {
-                            // Icon circle
-                            Circle()
-                                .fill(Color.gray.opacity(0.2))
-                                .frame(width: 44, height: 44)
-                                .overlay(
-                                    Text(option.1)
-                                        .font(.title2)
-                                )
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(option.0)
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.white)
-                                
-                                Text(option.2)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.gray)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            
-                            Spacer()
-                            
-                            if selectedCategory == option.0 {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.orange)
-                                    .font(.title2)
-                            }
-                        }
-                        .padding(.vertical, 8)
-                    }
-                    .listRowBackground(Color.gray.opacity(0.05))
-                    .listRowSeparator(.hidden)
-                }
-            }
-            .listStyle(PlainListStyle())
-            .background(Color.black)
-            .navigationTitle("Select Feed")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(.orange)
-                }
-            }
-        }
-        .preferredColorScheme(.dark)
-    }
-}
+
+
 
 // MARK: - Error Message View
 struct ErrorMessageView: View {
@@ -2265,4 +1913,75 @@ struct LocationListRowView: View {
     MapView()
         .environmentObject(DataManager())
         .environmentObject(LocationManager())
+}
+
+// MARK: - Location Category Selector
+struct LocationCategorySelector: View {
+    @Binding var selectedCategory: String
+    @Environment(\.dismiss) private var dismiss
+    
+    private let feedOptions = [
+        ("Outpost", "🗺️", "Social map of all submissions and explorations"),
+        ("Verified Map", "🏚️", "Map of places verified as abandoned"),
+        ("Social Feed", "📋", "Social feed list view of all places")
+    ]
+    
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(feedOptions, id: \.0) { option in
+                    Button(action: {
+                        selectedCategory = option.0
+                        dismiss()
+                    }) {
+                        HStack(spacing: 16) {
+                            // Icon circle
+                            Circle()
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(width: 44, height: 44)
+                                .overlay(
+                                    Text(option.1)
+                                        .font(.title2)
+                                )
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(option.0)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                
+                                Text(option.2)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            
+                            Spacer()
+                            
+                            if selectedCategory == option.0 {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.title2)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    .listRowBackground(Color.gray.opacity(0.05))
+                    .listRowSeparator(.hidden)
+                }
+            }
+            .listStyle(PlainListStyle())
+            .background(Color.black)
+            .navigationTitle("Select Feed")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(.orange)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
 }
