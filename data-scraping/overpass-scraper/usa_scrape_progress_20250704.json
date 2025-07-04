@@ -1,0 +1,98 @@
+{
+  "Alabama": {
+    "total_locations": 172,
+    "cities_processed": 4,
+    "cities_failed": 0,
+    "city_stats": {
+      "Birmingham": 48,
+      "Montgomery": 51,
+      "Huntsville": 57,
+      "Mobile": 16
+    }
+  },
+  "Alaska": {
+    "total_locations": 30,
+    "cities_processed": 3,
+    "cities_failed": 0,
+    "city_stats": {
+      "Anchorage": 13,
+      "Fairbanks": 12,
+      "Juneau": 5
+    }
+  },
+  "Arizona": {
+    "total_locations": 283,
+    "cities_processed": 4,
+    "cities_failed": 0,
+    "city_stats": {
+      "Phoenix": 110,
+      "Tucson": 94,
+      "Mesa": 64,
+      "Chandler": 15
+    }
+  },
+  "Arkansas": {
+    "total_locations": 50,
+    "cities_processed": 3,
+    "cities_failed": 0,
+    "city_stats": {
+      "Little Rock": 12,
+      "Fort Smith": 17,
+      "Fayetteville": 21
+    }
+  },
+  "California": {
+    "total_locations": 1198,
+    "cities_processed": 4,
+    "cities_failed": 0,
+    "city_stats": {
+      "Los Angeles": 659,
+      "San Francisco": 421,
+      "San Diego": 53,
+      "Sacramento": 65
+    }
+  },
+  "Colorado": {
+    "total_locations": 120,
+    "cities_processed": 4,
+    "cities_failed": 0,
+    "city_stats": {
+      "Denver": 79,
+      "Colorado Springs": 16,
+      "Aurora": 14,
+      "Fort Collins": 11
+    }
+  },
+  "Connecticut": {
+    "total_locations": 344,
+    "cities_processed": 4,
+    "cities_failed": 0,
+    "city_stats": {
+      "Bridgeport": 55,
+      "New Haven": 130,
+      "Hartford": 126,
+      "Stamford": 33
+    }
+  },
+  "Delaware": {
+    "total_locations": 100,
+    "cities_processed": 3,
+    "cities_failed": 0,
+    "city_stats": {
+      "Wilmington": 47,
+      "Dover": 28,
+      "Newark": 25
+    }
+  },
+  "Florida": {
+    "total_locations": 3453,
+    "cities_processed": 4,
+    "cities_failed": 0,
+    "city_stats": {
+      "Miami": 2860,
+      "Orlando": 96,
+      "Tampa": 325,
+      "Jacksonville": 172
+    }
+  }
+}
