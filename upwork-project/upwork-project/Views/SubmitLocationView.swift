@@ -147,8 +147,8 @@ struct SubmitLocationView: View {
             )
             .ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                Spacer()
+        VStack(spacing: 0) {
+            Spacer()
             
             // Video player with glow effect
             ZStack {
@@ -182,24 +182,24 @@ struct SubmitLocationView: View {
                         .shadow(color: Color(hex: "#7289da").opacity(0.6), radius: 25, x: 0, y: 0)
                 } else {
                     // Debug: Show if video file is not found
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color(white: 0.1))
-                        .frame(height: 300)
-                        .overlay(
-                            VStack(spacing: 16) {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(white: 0.1))
+                .frame(height: 300)
+                .overlay(
+                    VStack(spacing: 16) {
                                 Image(systemName: "exclamationmark.triangle")
                                     .font(.system(size: 32))
                                     .foregroundColor(.yellow)
-                                
+                        
                                 Text("Video not found")
-                                    .font(.system(size: 16, weight: .medium))
+                            .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(.white)
                                 
                                 Text("submission_video.mp4")
                                     .font(.system(size: 12))
-                                    .foregroundColor(.gray)
-                            }
-                        )
+                            .foregroundColor(.gray)
+                    }
+                )
                         .overlay(
                             RoundedRectangle(cornerRadius: 20)
                                 .stroke(Color.white.opacity(0.3), lineWidth: 1.5)
@@ -207,7 +207,7 @@ struct SubmitLocationView: View {
                         .shadow(color: Color(hex: "#7289da").opacity(0.6), radius: 25, x: 0, y: 0)
                 }
             }
-            .padding(.horizontal, 40)
+                .padding(.horizontal, 40)
             
             Spacer().frame(height: 60)
             
@@ -305,15 +305,15 @@ struct SubmitLocationView: View {
     private func MediaUploadScreen() -> some View {
         ScrollView {
             VStack(spacing: 20) {
-                Text("Did you capture any media of the abandoned place?")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
+            Text("Did you capture any media of the abandoned place?")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
                     .padding(.top, 10)
-                
+            
                 Text("\(photoImages.count + videoURLs.count) media files")
-                    .font(.system(size: 18, weight: .medium))
+                .font(.system(size: 18, weight: .medium))
                     .foregroundColor((photoImages.isEmpty && videoURLs.isEmpty) ? .gray : .red)
                 
                 if !isStep1Complete {
@@ -323,65 +323,65 @@ struct SubmitLocationView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
                 }
-                
+            
                 VStack(spacing: 16) {
-                    // Photo upload button
-                    PhotosPicker(
-                        selection: $selectedPhotos,
-                        maxSelectionCount: 5,
-                        matching: .images
-                    ) {
-                        MediaUploadCard(
-                            icon: "camera.fill",
-                            title: "Add media from\nPhotos app",
-                            subtitle: nil
-                        )
-                    }
-                    
+                // Photo upload button
+                PhotosPicker(
+                    selection: $selectedPhotos,
+                    maxSelectionCount: 5,
+                    matching: .images
+                ) {
+                    MediaUploadCard(
+                        icon: "camera.fill",
+                        title: "Add media from\nPhotos app",
+                        subtitle: nil
+                    )
+                }
+                
                     // Video upload from Photos
                     PhotosPicker(
                         selection: $selectedVideos,
                         maxSelectionCount: 3,
                         matching: .videos
                     ) {
-                        MediaUploadCard(
-                            icon: "video.fill",
-                            title: "Add video from\nCamera Roll",
-                            subtitle: nil
-                        )
+                MediaUploadCard(
+                    icon: "video.fill",
+                    title: "Add video from\nCamera Roll",
+                    subtitle: nil
+                )
                     }
-                }
-                
-                // Show selected photos
-                if !photoImages.isEmpty {
+            }
+            
+            // Show selected photos
+            if !photoImages.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Photos (\(photoImages.count))")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white)
                             .padding(.horizontal, 20)
                         
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(0..<photoImages.count, id: \.self) { index in
-                                    VStack(spacing: 8) {
-                                        Image(uiImage: photoImages[index])
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 80, height: 80)
-                                            .clipped()
-                                            .cornerRadius(12)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .stroke(Color.red, lineWidth: 2)
-                                            )
-                                        
-                                        Text("Photo \(index + 1)")
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
-                                    }
-                                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(0..<photoImages.count, id: \.self) { index in
+                            VStack(spacing: 8) {
+                                Image(uiImage: photoImages[index])
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 80, height: 80)
+                                    .clipped()
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.red, lineWidth: 2)
+                                    )
+                                
+                                Text("Photo \(index + 1)")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
                             }
-                            .padding(.horizontal, 20)
+                        }
+                    }
+                    .padding(.horizontal, 20)
                         }
                     }
                 }
@@ -424,43 +424,43 @@ struct SubmitLocationView: View {
                             }
                             .padding(.horizontal, 20)
                         }
-                    }
+                }
+            }
+            
+            // Info section
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(.red)
+                    Text("What makes good media?")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.red)
                 }
                 
-                // Info section
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "info.circle")
-                            .foregroundColor(.red)
-                        Text("What makes good media?")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.red)
-                    }
-                    
                     Text("• Clear, well-lit photos/videos showing the building's condition\n• Multiple angles of the structure\n• Any unique architectural features\n• Signs or identifying markers\n• Short videos showing movement or atmosphere")
-                        .font(.system(size: 14))
-                        .foregroundColor(.gray)
-                        .padding(.leading, 24)
+                    .font(.system(size: 14))
+                    .foregroundColor(.gray)
+                    .padding(.leading, 24)
                         .lineSpacing(2)
-                }
-                .padding(.horizontal, 20)
+            }
+            .padding(.horizontal, 20)
                 .padding(.top, 10)
-                
-                // Continue button
-                Button(action: {
-                    withAnimation(.spring()) {
-                        currentStep = 2
-                    }
-                }) {
-                    Text("Continue")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(isStep1Complete ? .black : .gray)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(isStep1Complete ? Color.white : Color.gray.opacity(0.3))
-                        .cornerRadius(25)
-                        .padding(.horizontal, 20)
+            
+            // Continue button
+            Button(action: {
+                withAnimation(.spring()) {
+                    currentStep = 2
                 }
+            }) {
+                Text("Continue")
+                    .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(isStep1Complete ? .black : .gray)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                        .background(isStep1Complete ? Color.white : Color.gray.opacity(0.3))
+                    .cornerRadius(25)
+                    .padding(.horizontal, 20)
+            }
                 .disabled(!isStep1Complete)
                 .padding(.bottom, 40)
             }

@@ -155,15 +155,7 @@ struct MapView: View {
             contentView
                 .ignoresSafeArea()
             
-            // Radar effect overlay on user location
-            if let userLocation = locationManager.userLocation {
-                RadarEffectView()
-                    .position(
-                        x: UIScreen.main.bounds.width / 2,
-                        y: UIScreen.main.bounds.height / 2
-                    )
-                    .allowsHitTesting(false) // Allow map interaction through the radar
-            }
+            // Radar effect is now integrated into the user location marker
             
             // Header Overlay - Updated to use new OutpostHeaderView
             VStack {
@@ -200,7 +192,7 @@ struct MapView: View {
                     onCreateGroupPressed: {
                         showingCreateGroup = true
                     },
-                    onJoinGroupPressed: {
+                    onJoinGroupPressed: { code in
                         showingJoinGroup = true
                     }
                 )
