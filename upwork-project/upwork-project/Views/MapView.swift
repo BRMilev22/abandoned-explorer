@@ -146,6 +146,10 @@ struct MapView: View {
             .environmentObject(locationManager)
     }
     
+    // Add new state variables at the top with other @State properties
+    @State private var showRadarCount = false
+    @State private var showCenterButton = true
+    
     var body: some View {
         ZStack {
             // Background
@@ -156,6 +160,37 @@ struct MapView: View {
                 .ignoresSafeArea()
             
             // Radar effect is now integrated into the user location marker
+            
+            // Add after the content but before the header overlay
+            if showRadarCount {
+                RadarCountView(
+                    userCount: dataManager.activeUsersCount,
+                    locationCount: dataManager.getApprovedLocations().count,
+                    isVisible: $showRadarCount,
+                    userLocation: locationManager.userLocation
+                )
+                .zIndex(2)
+            }
+            
+            // Add center button in bottom right corner
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: centerOnUser) {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.black.opacity(0.8))
+                            .clipShape(Circle())
+                            .shadow(color: Color.black.opacity(0.3), radius: 5)
+                    }
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 100) // Adjust based on your bottom panel height
+                }
+            }
+            .opacity(showCenterButton ? 1 : 0)
             
             // Header Overlay - Updated to use new OutpostHeaderView
             VStack {
@@ -385,6 +420,11 @@ struct MapView: View {
                     print("🌍 Received continental zoom notification - loading global locations (zoom: \(String(format: "%.1f", zoomLevel)))")
                     loadGlobalLocationsBypassingThrottling()
                 }
+            }
+            
+            // Add to existing onAppear
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                showRadarCount = true
             }
         }
         .onChange(of: locationManager.userLocation) {
@@ -863,6 +903,28 @@ struct MapView: View {
         print("🚀 Loading global locations with throttling bypass for continental view")
         dataManager.loadAllLocationsWithBypass()
     }
+    
+    // Add new function for centering on user
+    private func centerOnUser() {
+        guard let userLocation = locationManager.userLocation else { return }
+        
+        // Notify any observers that we want to center on user
+        NotificationCenter.default.post(
+            name: NSNotification.Name("CenterOnUserLocation"),
+            object: nil,
+            userInfo: ["coordinate": userLocation]
+        )
+        
+        // Add visual feedback
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showCenterButton = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showCenterButton = true
+            }
+        }
+    }
 }
 
 // MARK: - Mapbox Map View
@@ -998,6 +1060,8 @@ struct MapboxMapView: UIViewRepresentable {
         deinit {
             debounceTimer?.invalidate()
             cancellables.removeAll()
+            // Remove the observer when coordinator is deallocated
+            NotificationCenter.default.removeObserver(self)
         }
         
         func setupAnnotationManagers(mapView: MapboxMaps.MapView) {
@@ -1010,6 +1074,24 @@ struct MapboxMapView: UIViewRepresentable {
             
             // Setup user annotation manager
             userAnnotationManager = mapView.annotations.makePointAnnotationManager()
+            
+            // Add observer for centering on user location
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("CenterOnUserLocation"),
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let mapView = self?.mapView,
+                      let userLocation = notification.userInfo?["coordinate"] as? CLLocationCoordinate2D else {
+                    return
+                }
+                
+                let cameraOptions = CameraOptions(
+                    center: userLocation,
+                    zoom: 14.0
+                )
+                mapView.mapboxMap.setCamera(to: cameraOptions)
+            }
         }
         
         @objc func handleMapTap(_ gesture: UITapGestureRecognizer) {
@@ -1975,5 +2057,242 @@ struct LocationCategorySelector: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+}
+
+// Replace the RadarCountView with this updated version
+struct RadarCountView: View {
+    let userCount: Int
+    let locationCount: Int
+    @Binding var isVisible: Bool
+    let userLocation: CLLocationCoordinate2D?
+    
+    @State private var showUserCount = false
+    @State private var showLocationCount = false
+    @State private var pulseScale: CGFloat = 1.0
+    @State private var pulseOpacity: Double = 0.0
+    @State private var contentOpacity: Double = 0.0
+    @State private var radarAngle: Double = 0
+    @State private var showRadar = true
+    
+    // Theme color - matches your app's bluish theme
+    private let themeColor = Color(red: 0.0, green: 0.8, blue: 1.0)
+    
+    var body: some View {
+        ZStack {
+            // Radar effect at user location
+            if let userLocation = userLocation, showRadar {
+                GeometryReader { geometry in
+                    ZStack {
+                        // Radar circles
+                        ForEach(0..<3) { index in
+                            Circle()
+                                .stroke(themeColor.opacity(0.3), lineWidth: 1)
+                                .scaleEffect(pulseScale)
+                                .opacity(pulseOpacity * (1.0 - Double(index) * 0.2))
+                        }
+                        
+                        // Radar grid
+                        Circle()
+                            .stroke(themeColor.opacity(0.2), lineWidth: 1)
+                        
+                        // Cross lines
+                        Path { path in
+                            path.move(to: CGPoint(x: 0, y: 50))
+                            path.addLine(to: CGPoint(x: 100, y: 50))
+                            path.move(to: CGPoint(x: 50, y: 0))
+                            path.addLine(to: CGPoint(x: 50, y: 100))
+                        }
+                        .stroke(themeColor.opacity(0.2), lineWidth: 1)
+                        
+                        // Rotating scan line
+                        Path { path in
+                            path.move(to: CGPoint(x: 50, y: 50))
+                            path.addLine(to: CGPoint(x: 100, y: 50))
+                        }
+                        .stroke(
+                            LinearGradient(
+                                gradient: Gradient(colors: [themeColor.opacity(0.6), themeColor.opacity(0)]),
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 2
+                        )
+                        .rotationEffect(.degrees(radarAngle))
+                    }
+                    .frame(width: 100, height: 100)
+                    .position(x: geometry.size.width/2, y: geometry.size.height/2)
+                }
+            }
+            
+            // Count displays at bottom
+            VStack {
+                Spacer()
+                
+                ZStack {
+                    if showUserCount {
+                        CountDisplayView(
+                            icon: "person.fill",
+                            count: userCount,
+                            type: "users",
+                            themeColor: themeColor
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+                    
+                    if showLocationCount {
+                        CountDisplayView(
+                            icon: "mappin.circle.fill",
+                            count: locationCount,
+                            type: "locations",
+                            themeColor: themeColor
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+                }
+                .padding(.bottom, 100)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            startAnimation()
+        }
+    }
+    
+    private func startAnimation() {
+        // Start radar animation
+        withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+            radarAngle = 360
+        }
+        
+        // Start pulse animation
+        withAnimation(Animation.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+            pulseScale = 1.5
+            pulseOpacity = 0.8
+        }
+        
+        // Show user count first
+        withAnimation(.easeInOut(duration: 0.5)) {
+            showUserCount = true
+        }
+        
+        // Hide user count and show location count after 1.5 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeInOut(duration: 0.5)) {
+                showUserCount = false
+            }
+            
+            // Show location count after user count fades out
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    showLocationCount = true
+                }
+                
+                // Hide location count and radar after 1.5 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        showLocationCount = false
+                        showRadar = false
+                    }
+                    
+                    // Reset visibility after all animations
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        isVisible = false
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Add this new view for consistent count display
+struct CountDisplayView: View {
+    let icon: String
+    let count: Int
+    let type: String
+    let themeColor: Color
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .foregroundColor(themeColor)
+                .font(.system(size: 20))
+            
+            Text("\(count) \(type)")
+                .foregroundColor(.white)
+                .font(.system(size: 18, weight: .semibold))
+            
+            Text("around you")
+                .foregroundColor(.white.opacity(0.8))
+                .font(.system(size: 18))
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(Color.black.opacity(0.7))
+        .cornerRadius(20)
+        .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+    }
+}
+
+// Add these new supporting views right after RadarCountView
+struct RadarGridView: View {
+    let themeColor: Color
+    
+    var body: some View {
+        ZStack {
+            // Concentric circles
+            ForEach(1...4, id: \.self) { index in
+                Circle()
+                    .stroke(themeColor, lineWidth: 1)
+                    .frame(width: 300 / CGFloat(index), height: 300 / CGFloat(index))
+            }
+            
+            // Cross lines
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: 150))
+                path.addLine(to: CGPoint(x: 300, y: 150))
+                path.move(to: CGPoint(x: 150, y: 0))
+                path.addLine(to: CGPoint(x: 150, y: 300))
+            }
+            .stroke(themeColor, lineWidth: 1)
+            
+            // Diagonal lines
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: 0))
+                path.addLine(to: CGPoint(x: 300, y: 300))
+                path.move(to: CGPoint(x: 300, y: 0))
+                path.addLine(to: CGPoint(x: 0, y: 300))
+            }
+            .stroke(themeColor, lineWidth: 1)
+        }
+    }
+}
+
+struct RadarScanLineView: View {
+    let angle: Double
+    let themeColor: Color
+    
+    var body: some View {
+        GeometryReader { geometry in
+            Path { path in
+                let center = CGPoint(x: geometry.size.width/2, y: geometry.size.height/2)
+                let radius = min(geometry.size.width, geometry.size.height) / 2
+                
+                path.move(to: center)
+                path.addLine(to: CGPoint(
+                    x: center.x + radius * cos(CGFloat(angle) * .pi / 180),
+                    y: center.y + radius * sin(CGFloat(angle) * .pi / 180)
+                ))
+            }
+            .stroke(
+                LinearGradient(
+                    gradient: Gradient(colors: [themeColor.opacity(0.8), themeColor.opacity(0)]),
+                    startPoint: .center,
+                    endPoint: .trailing
+                ),
+                lineWidth: 2
+            )
+        }
+        .rotationEffect(.degrees(-90))  // Start from top instead of right
     }
 }
