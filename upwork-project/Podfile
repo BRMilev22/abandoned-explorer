@@ -21,8 +21,7 @@ end
 
 # Workaround for rsync issues with Mapbox
 install! 'cocoapods', 
-  :deterministic_uuids => false,
-  :integrate_targets => false
+  :deterministic_uuids => false
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
@@ -56,7 +55,4 @@ post_install do |installer|
       config.build_settings['SWIFT_COMPILATION_MODE'] = 'wholemodule'
     end
   end
-  
-  # Manual integration since we disabled automatic integration
-  installer.integrate!
 end

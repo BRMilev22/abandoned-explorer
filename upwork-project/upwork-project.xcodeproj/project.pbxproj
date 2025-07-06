@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2D7DF756E2CB82D1E8599C68 /* Pods_upwork_project.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 157AEE9812C29A41766066F0 /* Pods_upwork_project.framework */; };
-		32D54B147BB418F29C5FD51E /* Pods_upwork_projectTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 335AAD7A2D4CAF56B6C5E0AB /* Pods_upwork_projectTests.framework */; };
-		52120C988C084B5B0DBE834B /* Pods_upwork_project_upwork_projectUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6BFD0E6F69751F8CD526E7A6 /* Pods_upwork_project_upwork_projectUITests.framework */; };
+		2A2AF666303ADEAF48E0A265 /* Pods_upwork_project_upwork_projectUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D68860AD58D0E1CDFADD06FE /* Pods_upwork_project_upwork_projectUITests.framework */; };
+		3277A04CAFBE69E3DA0E5244 /* Pods_upwork_projectTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E496273414166F03BF43E62 /* Pods_upwork_projectTests.framework */; };
+		84C6FF61F7BD4192B4433E36 /* Pods_upwork_project.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 98F7C7B09D0552807497D251 /* Pods_upwork_project.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -30,33 +30,39 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		157AEE9812C29A41766066F0 /* Pods_upwork_project.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_upwork_project.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		335AAD7A2D4CAF56B6C5E0AB /* Pods_upwork_projectTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_upwork_projectTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		346715DB0BAB91FE28DF1B6F /* Pods-upwork-project-upwork-projectUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project-upwork-projectUITests.debug.xcconfig"; path = "Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests.debug.xcconfig"; sourceTree = "<group>"; };
+		01A4D075F81EF51A1F60F4D7 /* Pods-upwork-projectTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-projectTests.release.xcconfig"; path = "Target Support Files/Pods-upwork-projectTests/Pods-upwork-projectTests.release.xcconfig"; sourceTree = "<group>"; };
+		2721B88B7E1C2579011F13FE /* Pods-upwork-project-upwork-projectUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project-upwork-projectUITests.release.xcconfig"; path = "Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests.release.xcconfig"; sourceTree = "<group>"; };
+		35AC31D78FACDBEF3A84F9F9 /* Pods-upwork-projectTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-projectTests.debug.xcconfig"; path = "Target Support Files/Pods-upwork-projectTests/Pods-upwork-projectTests.debug.xcconfig"; sourceTree = "<group>"; };
+		3E496273414166F03BF43E62 /* Pods_upwork_projectTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_upwork_projectTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		4599DB9C2E08668900578100 /* upwork-project.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "upwork-project.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4599DBA92E08668A00578100 /* upwork-projectTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "upwork-projectTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4599DBB32E08668A00578100 /* upwork-projectUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "upwork-projectUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		6BFD0E6F69751F8CD526E7A6 /* Pods_upwork_project_upwork_projectUITests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_upwork_project_upwork_projectUITests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		94154C1522CBFDAB5027FE37 /* Pods-upwork-projectTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-projectTests.debug.xcconfig"; path = "Target Support Files/Pods-upwork-projectTests/Pods-upwork-projectTests.debug.xcconfig"; sourceTree = "<group>"; };
-		A757741CBE13A7307331BE38 /* Pods-upwork-projectTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-projectTests.release.xcconfig"; path = "Target Support Files/Pods-upwork-projectTests/Pods-upwork-projectTests.release.xcconfig"; sourceTree = "<group>"; };
-		B6D00C2D2E1AC572D12E2587 /* Pods-upwork-project.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project.debug.xcconfig"; path = "Target Support Files/Pods-upwork-project/Pods-upwork-project.debug.xcconfig"; sourceTree = "<group>"; };
-		DD5F7BB4FC0671E867EBF32F /* Pods-upwork-project-upwork-projectUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project-upwork-projectUITests.release.xcconfig"; path = "Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests.release.xcconfig"; sourceTree = "<group>"; };
-		E78D80850B9F110E0B7E8D77 /* Pods-upwork-project.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project.release.xcconfig"; path = "Target Support Files/Pods-upwork-project/Pods-upwork-project.release.xcconfig"; sourceTree = "<group>"; };
+		5C1F9C478C365EC09161EE49 /* Pods-upwork-project.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project.debug.xcconfig"; path = "Target Support Files/Pods-upwork-project/Pods-upwork-project.debug.xcconfig"; sourceTree = "<group>"; };
+		98F7C7B09D0552807497D251 /* Pods_upwork_project.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_upwork_project.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		99D111F8D337080988DB7382 /* Pods-upwork-project.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project.release.xcconfig"; path = "Target Support Files/Pods-upwork-project/Pods-upwork-project.release.xcconfig"; sourceTree = "<group>"; };
+		D68860AD58D0E1CDFADD06FE /* Pods_upwork_project_upwork_projectUITests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_upwork_project_upwork_projectUITests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCAB9720BF5DB541491A5CC7 /* Pods-upwork-project-upwork-projectUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-upwork-project-upwork-projectUITests.debug.xcconfig"; path = "Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4599DB9E2E08668900578100 /* upwork-project */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "upwork-project";
 			sourceTree = "<group>";
 		};
 		4599DBAC2E08668A00578100 /* upwork-projectTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "upwork-projectTests";
 			sourceTree = "<group>";
 		};
 		4599DBB62E08668A00578100 /* upwork-projectUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "upwork-projectUITests";
 			sourceTree = "<group>";
 		};
@@ -67,7 +73,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2D7DF756E2CB82D1E8599C68 /* Pods_upwork_project.framework in Frameworks */,
+				84C6FF61F7BD4192B4433E36 /* Pods_upwork_project.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,7 +81,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				32D54B147BB418F29C5FD51E /* Pods_upwork_projectTests.framework in Frameworks */,
+				3277A04CAFBE69E3DA0E5244 /* Pods_upwork_projectTests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -83,7 +89,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				52120C988C084B5B0DBE834B /* Pods_upwork_project_upwork_projectUITests.framework in Frameworks */,
+				2A2AF666303ADEAF48E0A265 /* Pods_upwork_project_upwork_projectUITests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -106,7 +112,7 @@
 				4599DBB62E08668A00578100 /* upwork-projectUITests */,
 				4599DB9D2E08668900578100 /* Products */,
 				EE11D22154BCE5C3EE5BED2D /* Pods */,
-				AA3C2488DA22472AC895D3BA /* Frameworks */,
+				A11B85B550D42C1A9E7E42F1 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -120,12 +126,12 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		AA3C2488DA22472AC895D3BA /* Frameworks */ = {
+		A11B85B550D42C1A9E7E42F1 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				157AEE9812C29A41766066F0 /* Pods_upwork_project.framework */,
-				6BFD0E6F69751F8CD526E7A6 /* Pods_upwork_project_upwork_projectUITests.framework */,
-				335AAD7A2D4CAF56B6C5E0AB /* Pods_upwork_projectTests.framework */,
+				98F7C7B09D0552807497D251 /* Pods_upwork_project.framework */,
+				D68860AD58D0E1CDFADD06FE /* Pods_upwork_project_upwork_projectUITests.framework */,
+				3E496273414166F03BF43E62 /* Pods_upwork_projectTests.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -133,12 +139,12 @@
 		EE11D22154BCE5C3EE5BED2D /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				B6D00C2D2E1AC572D12E2587 /* Pods-upwork-project.debug.xcconfig */,
-				E78D80850B9F110E0B7E8D77 /* Pods-upwork-project.release.xcconfig */,
-				346715DB0BAB91FE28DF1B6F /* Pods-upwork-project-upwork-projectUITests.debug.xcconfig */,
-				DD5F7BB4FC0671E867EBF32F /* Pods-upwork-project-upwork-projectUITests.release.xcconfig */,
-				94154C1522CBFDAB5027FE37 /* Pods-upwork-projectTests.debug.xcconfig */,
-				A757741CBE13A7307331BE38 /* Pods-upwork-projectTests.release.xcconfig */,
+				5C1F9C478C365EC09161EE49 /* Pods-upwork-project.debug.xcconfig */,
+				99D111F8D337080988DB7382 /* Pods-upwork-project.release.xcconfig */,
+				DCAB9720BF5DB541491A5CC7 /* Pods-upwork-project-upwork-projectUITests.debug.xcconfig */,
+				2721B88B7E1C2579011F13FE /* Pods-upwork-project-upwork-projectUITests.release.xcconfig */,
+				35AC31D78FACDBEF3A84F9F9 /* Pods-upwork-projectTests.debug.xcconfig */,
+				01A4D075F81EF51A1F60F4D7 /* Pods-upwork-projectTests.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -150,11 +156,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 4599DBBD2E08668A00578100 /* Build configuration list for PBXNativeTarget "upwork-project" */;
 			buildPhases = (
-				61344970F79F775D238E1D41 /* [CP] Check Pods Manifest.lock */,
+				21D3EB3E95750703E28C7128 /* [CP] Check Pods Manifest.lock */,
 				4599DB982E08668900578100 /* Sources */,
 				4599DB992E08668900578100 /* Frameworks */,
 				4599DB9A2E08668900578100 /* Resources */,
-				35C7525FB6D81E0E3FAE1B13 /* [CP] Embed Pods Frameworks */,
+				A53B2F291D7F8B12BC4073B8 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -172,7 +178,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 4599DBC02E08668A00578100 /* Build configuration list for PBXNativeTarget "upwork-projectTests" */;
 			buildPhases = (
-				21F61683A0F80B55DAE3E909 /* [CP] Check Pods Manifest.lock */,
+				0974C35FE6D63C0FA01E70D0 /* [CP] Check Pods Manifest.lock */,
 				4599DBA52E08668A00578100 /* Sources */,
 				4599DBA62E08668A00578100 /* Frameworks */,
 				4599DBA72E08668A00578100 /* Resources */,
@@ -194,11 +200,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 4599DBC32E08668A00578100 /* Build configuration list for PBXNativeTarget "upwork-projectUITests" */;
 			buildPhases = (
-				58FB78CFC3A981FD851AC147 /* [CP] Check Pods Manifest.lock */,
+				C7B509AD29ABF3AA5A1681E9 /* [CP] Check Pods Manifest.lock */,
 				4599DBAF2E08668A00578100 /* Sources */,
 				4599DBB02E08668A00578100 /* Frameworks */,
 				4599DBB12E08668A00578100 /* Resources */,
-				290C7AF3CC1277E98BB6A926 /* [CP] Embed Pods Frameworks */,
+				A23D01C9E41A1B15A69A4760 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -282,7 +288,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		21F61683A0F80B55DAE3E909 /* [CP] Check Pods Manifest.lock */ = {
+		0974C35FE6D63C0FA01E70D0 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -304,71 +310,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		290C7AF3CC1277E98BB6A926 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			inputPaths = (
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		35C7525FB6D81E0E3FAE1B13 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-upwork-project/Pods-upwork-project-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			inputPaths = (
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-upwork-project/Pods-upwork-project-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-upwork-project/Pods-upwork-project-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		58FB78CFC3A981FD851AC147 /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-upwork-project-upwork-projectUITests-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		61344970F79F775D238E1D41 /* [CP] Check Pods Manifest.lock */ = {
+		21D3EB3E95750703E28C7128 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -384,6 +326,62 @@
 			);
 			outputPaths = (
 				"$(DERIVED_FILE_DIR)/Pods-upwork-project-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		A23D01C9E41A1B15A69A4760 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		A53B2F291D7F8B12BC4073B8 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-upwork-project/Pods-upwork-project-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-upwork-project/Pods-upwork-project-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-upwork-project/Pods-upwork-project-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		C7B509AD29ABF3AA5A1681E9 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-upwork-project-upwork-projectUITests-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -553,7 +551,7 @@
 		};
 		4599DBBE2E08668A00578100 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = B6D00C2D2E1AC572D12E2587 /* Pods-upwork-project.debug.xcconfig */;
+			baseConfigurationReference = 5C1F9C478C365EC09161EE49 /* Pods-upwork-project.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -584,7 +582,7 @@
 		};
 		4599DBBF2E08668A00578100 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = E78D80850B9F110E0B7E8D77 /* Pods-upwork-project.release.xcconfig */;
+			baseConfigurationReference = 99D111F8D337080988DB7382 /* Pods-upwork-project.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -615,7 +613,7 @@
 		};
 		4599DBC12E08668A00578100 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 94154C1522CBFDAB5027FE37 /* Pods-upwork-projectTests.debug.xcconfig */;
+			baseConfigurationReference = 35AC31D78FACDBEF3A84F9F9 /* Pods-upwork-projectTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -635,7 +633,7 @@
 		};
 		4599DBC22E08668A00578100 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = A757741CBE13A7307331BE38 /* Pods-upwork-projectTests.release.xcconfig */;
+			baseConfigurationReference = 01A4D075F81EF51A1F60F4D7 /* Pods-upwork-projectTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -655,7 +653,7 @@
 		};
 		4599DBC42E08668A00578100 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 346715DB0BAB91FE28DF1B6F /* Pods-upwork-project-upwork-projectUITests.debug.xcconfig */;
+			baseConfigurationReference = DCAB9720BF5DB541491A5CC7 /* Pods-upwork-project-upwork-projectUITests.debug.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -673,7 +671,7 @@
 		};
 		4599DBC52E08668A00578100 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = DD5F7BB4FC0671E867EBF32F /* Pods-upwork-project-upwork-projectUITests.release.xcconfig */;
+			baseConfigurationReference = 2721B88B7E1C2579011F13FE /* Pods-upwork-project-upwork-projectUITests.release.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

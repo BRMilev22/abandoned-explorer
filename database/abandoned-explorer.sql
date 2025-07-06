@@ -76,14 +76,15 @@ CREATE TABLE IF NOT EXISTS `bookmarks` (
   KEY `idx_location_bookmarks` (`location_id`),
   CONSTRAINT `bookmarks_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `bookmarks_ibfk_2` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dumping data for table abandoned_explorer.bookmarks: ~4 rows (approximately)
+-- Dumping data for table abandoned_explorer.bookmarks: ~5 rows (approximately)
 INSERT INTO `bookmarks` (`id`, `uuid`, `user_id`, `location_id`, `notes`, `created_at`) VALUES
 	(8, NULL, 1, 1, NULL, '2025-06-23 01:00:37'),
 	(15, NULL, 2, 2, NULL, '2025-06-23 02:59:43'),
 	(22, NULL, 2, 4, NULL, '2025-06-27 12:59:43'),
-	(23, NULL, 2, 46, NULL, '2025-06-27 12:59:56');
+	(23, NULL, 2, 46, NULL, '2025-06-27 12:59:56'),
+	(24, NULL, 1, 4, NULL, '2025-07-02 11:59:28');
 
 -- Dumping structure for table abandoned_explorer.comments
 CREATE TABLE IF NOT EXISTS `comments` (
@@ -151,7 +152,7 @@ CREATE TABLE IF NOT EXISTS `groups` (
   `is_private` tinyint(1) DEFAULT 0,
   `member_limit` int(11) DEFAULT 50,
   `avatar_color` varchar(7) DEFAULT '#7289da',
-  `emoji` varchar(10) DEFAULT '🏚️',
+  `emoji` varchar(10) DEFAULT '?️',
   `region` varchar(50) DEFAULT 'Unknown',
   `points` int(11) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -165,11 +166,66 @@ CREATE TABLE IF NOT EXISTS `groups` (
   KEY `idx_created_at` (`created_at`),
   KEY `idx_region` (`region`),
   CONSTRAINT `groups_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dumping data for table abandoned_explorer.groups: ~1 rows (approximately)
-INSERT INTO `groups` (`id`, `uuid`, `name`, `description`, `invite_code`, `created_by`, `is_private`, `member_limit`, `avatar_color`, `emoji`, `region`, `points`, `created_at`, `updated_at`) VALUES
-	(3, '8644adf7-ce70-4e97-a31e-fb921b1ccf76', 'Test group 1', NULL, '4KGZKVDQ', 1, 1, 4, '#7289da', '☀️', 'EU', 150, '2025-06-30 11:44:29', '2025-06-30 11:44:29');
+-- Dumping data for table abandoned_explorer.groups: ~0 rows (approximately)
+
+-- Dumping structure for table abandoned_explorer.group_admin_actions
+CREATE TABLE IF NOT EXISTS `group_admin_actions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) DEFAULT NULL,
+  `group_id` int(11) NOT NULL,
+  `admin_id` int(11) NOT NULL,
+  `target_user_id` int(11) DEFAULT NULL,
+  `action_type` enum('kick','ban','unban','delete_message','promote','demote','delete_group') NOT NULL,
+  `reason` text DEFAULT NULL,
+  `metadata` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`metadata`)),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_uuid` (`uuid`),
+  KEY `idx_group_actions` (`group_id`,`created_at`),
+  KEY `idx_admin_actions` (`admin_id`,`created_at`),
+  KEY `idx_target_user` (`target_user_id`),
+  KEY `idx_action_type` (`action_type`),
+  CONSTRAINT `group_admin_actions_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_admin_actions_ibfk_2` FOREIGN KEY (`admin_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_admin_actions_ibfk_3` FOREIGN KEY (`target_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for table abandoned_explorer.group_admin_actions: ~0 rows (approximately)
+
+-- Dumping structure for table abandoned_explorer.group_bans
+CREATE TABLE IF NOT EXISTS `group_bans` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) DEFAULT NULL,
+  `group_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `banned_by` int(11) NOT NULL,
+  `ban_reason` text DEFAULT NULL,
+  `ban_type` enum('kick','ban') DEFAULT 'ban',
+  `is_permanent` tinyint(1) DEFAULT 1,
+  `expires_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `unbanned_at` timestamp NULL DEFAULT NULL,
+  `unbanned_by` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_active_ban` (`group_id`,`user_id`,`unbanned_at`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_uuid` (`uuid`),
+  KEY `idx_group_bans` (`group_id`,`created_at`),
+  KEY `idx_user_bans` (`user_id`,`created_at`),
+  KEY `idx_banned_by` (`banned_by`),
+  KEY `idx_unbanned_by` (`unbanned_by`),
+  KEY `idx_ban_type` (`ban_type`),
+  KEY `idx_active_bans` (`group_id`,`unbanned_at`),
+  CONSTRAINT `group_bans_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_bans_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_bans_ibfk_3` FOREIGN KEY (`banned_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_bans_ibfk_4` FOREIGN KEY (`unbanned_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for table abandoned_explorer.group_bans: ~0 rows (approximately)
 
 -- Dumping structure for table abandoned_explorer.group_locations
 CREATE TABLE IF NOT EXISTS `group_locations` (
@@ -215,12 +271,9 @@ CREATE TABLE IF NOT EXISTS `group_members` (
   KEY `idx_role` (`role`),
   CONSTRAINT `group_members_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
   CONSTRAINT `group_members_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dumping data for table abandoned_explorer.group_members: ~1 rows (approximately)
-INSERT INTO `group_members` (`id`, `uuid`, `group_id`, `user_id`, `role`, `nickname`, `joined_at`, `last_active_at`) VALUES
-	(3, '176c1ec3-027c-4288-b3da-605d4d5af594', 3, 1, 'owner', NULL, '2025-06-30 11:44:29', '2025-06-30 23:01:59'),
-	(5, '6c589649-0274-4104-b3d3-177e57b809ba', 3, 2, 'member', NULL, '2025-07-01 05:23:38', '2025-07-01 05:30:23');
+-- Dumping data for table abandoned_explorer.group_members: ~0 rows (approximately)
 
 -- Dumping structure for table abandoned_explorer.group_messages
 CREATE TABLE IF NOT EXISTS `group_messages` (
@@ -247,17 +300,28 @@ CREATE TABLE IF NOT EXISTS `group_messages` (
   CONSTRAINT `group_messages_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `group_messages_ibfk_3` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `group_messages_ibfk_4` FOREIGN KEY (`reply_to_id`) REFERENCES `group_messages` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dumping data for table abandoned_explorer.group_messages: ~2 rows (approximately)
-INSERT INTO `group_messages` (`id`, `uuid`, `group_id`, `user_id`, `message_type`, `content`, `location_id`, `image_url`, `reply_to_id`, `created_at`, `updated_at`, `deleted_at`) VALUES
-	(1, 'b2ce3590-01ac-4f31-85b5-4e62b757f8e8', 3, 1, 'text', 'Hello', NULL, NULL, NULL, '2025-06-30 21:24:34', '2025-06-30 21:24:34', NULL),
-	(2, 'a179ec3d-8d6a-41b7-9ceb-36d1d8049959', 3, 1, 'text', 'Test', NULL, NULL, NULL, '2025-06-30 22:53:56', '2025-06-30 22:53:56', NULL),
-	(3, '118921b0-4de3-4f19-8373-a63944b6c8f4', 3, 1, 'text', 'Fixing', NULL, NULL, NULL, '2025-06-30 23:01:51', '2025-06-30 23:01:51', NULL),
-	(4, 'f52a9b9f-06ad-47eb-aaf6-43252d771da6', 3, 1, 'text', 'Test', NULL, NULL, 3, '2025-06-30 23:01:59', '2025-06-30 23:01:59', NULL),
-	(5, '10a9f5dd-0861-42c7-a5bb-65506911f69d', 3, 2, 'system', 'joined the group', NULL, NULL, NULL, '2025-06-30 23:02:55', '2025-06-30 23:02:55', NULL),
-	(6, '61ff06cb-c8a0-4ada-b05f-33bf86cc69ab', 3, 2, 'system', 'left the group', NULL, NULL, NULL, '2025-07-01 05:22:46', '2025-07-01 05:22:46', NULL),
-	(7, '864d5d27-2664-4f62-9698-4e8b5e00c168', 3, 2, 'system', 'joined the group', NULL, NULL, NULL, '2025-07-01 05:23:38', '2025-07-01 05:23:38', NULL);
+-- Dumping data for table abandoned_explorer.group_messages: ~0 rows (approximately)
+
+-- Dumping structure for table abandoned_explorer.group_message_likes
+CREATE TABLE IF NOT EXISTS `group_message_likes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `uuid` char(36) DEFAULT NULL,
+  `message_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_message_like` (`message_id`,`user_id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_uuid` (`uuid`),
+  KEY `idx_message_likes` (`message_id`),
+  KEY `idx_user_likes` (`user_id`),
+  CONSTRAINT `group_message_likes_ibfk_1` FOREIGN KEY (`message_id`) REFERENCES `group_messages` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `group_message_likes_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dumping data for table abandoned_explorer.group_message_likes: ~0 rows (approximately)
 
 -- Dumping structure for table abandoned_explorer.likes
 CREATE TABLE IF NOT EXISTS `likes` (
@@ -328,10 +392,10 @@ CREATE TABLE IF NOT EXISTS `locations` (
 
 -- Dumping data for table abandoned_explorer.locations: ~62 rows (approximately)
 INSERT INTO `locations` (`id`, `uuid`, `title`, `description`, `latitude`, `longitude`, `address`, `category_id`, `danger_level_id`, `submitted_by`, `is_approved`, `approval_date`, `approved_by`, `featured`, `views_count`, `likes_count`, `bookmarks_count`, `comments_count`, `created_at`, `updated_at`, `deleted_at`) VALUES
-	(1, NULL, 'Abandoned Hospital', 'Description test', 37.78583400, -122.40641700, 'Lat: 37.785834, Lng: -122.406417', 1, 3, 1, 1, '2025-06-23 00:24:56', 1, 0, 970, 35, 36, 0, '2025-06-23 00:03:11', '2025-06-29 21:02:43', NULL),
+	(1, NULL, 'Abandoned Hospital', 'Description test', 37.78583400, -122.40641700, 'Lat: 37.785834, Lng: -122.406417', 1, 3, 1, 1, '2025-06-23 00:24:56', 1, 0, 971, 35, 36, 0, '2025-06-23 00:03:11', '2025-07-02 11:59:23', NULL),
 	(2, NULL, 'Test 2', 'Test 2', 37.78583400, -122.40641700, 'Lat: 37.785834, Lng: -122.406417', 8, 2, 2, 1, '2025-06-23 01:36:42', 2, 0, 530, 79, 8, 0, '2025-06-23 01:25:15', '2025-06-29 23:45:54', NULL),
 	(3, NULL, 'Test 3', 'Test 3', 37.78583400, -122.40641700, 'Lat: 37.785834, Lng: -122.406417', 4, 1, 1, 1, '2025-06-23 02:59:54', 2, 0, 688, 87, 33, 0, '2025-06-23 02:59:22', '2025-06-29 16:20:07', NULL),
-	(4, NULL, 'Test', 'Teary', 42.34309088, 27.18902228, 'Lat: 42.343091, Lng: 27.189022', 4, 3, 1, 1, '2025-06-24 00:44:30', 2, 0, 815, 1, 1, 4, '2025-06-24 00:36:21', '2025-06-30 23:03:10', NULL),
+	(4, NULL, 'Test', 'Teary', 42.34309088, 27.18902228, 'Lat: 42.343091, Lng: 27.189022', 4, 3, 1, 1, '2025-06-24 00:44:30', 2, 0, 822, 1, 2, 4, '2025-06-24 00:36:21', '2025-07-06 13:47:14', NULL),
 	(5, '3437302c-50a5-11f0-a415-36cb2806145a', 'Abandoned Hospital NYC', 'Old Bellevue psychiatric ward, creepy but fascinating', 40.73860000, -73.98570000, 'Manhattan, NY', 1, 2, 1, 1, '2025-06-24 02:44:52', NULL, 0, 863, 109, 2, 0, '2025-06-24 02:44:52', '2025-06-24 02:44:52', NULL),
 	(6, '34381eb0-50a5-11f0-a415-36cb2806145a', 'Defunct Factory Manhattan', 'Industrial complex from the 1920s', 40.75050000, -73.99340000, 'Manhattan, NY', 2, 2, 1, 1, '2025-06-24 02:44:52', NULL, 0, 885, 155, 90, 0, '2025-06-24 02:44:52', '2025-06-24 02:44:52', NULL),
 	(7, '343854ac-50a5-11f0-a415-36cb2806145a', 'Old School Building', 'Abandoned elementary school with intact classrooms', 40.72820000, -73.99420000, 'Manhattan, NY', 3, 1, 1, 1, '2025-06-24 02:44:52', NULL, 0, 787, 43, 42, 0, '2025-06-24 02:44:52', '2025-06-27 09:49:54', NULL),
@@ -373,10 +437,10 @@ INSERT INTO `locations` (`id`, `uuid`, `title`, `description`, `latitude`, `long
 	(43, '3439b48c-50a5-11f0-a415-36cb2806145a', 'Shibuya Factory', 'Electronics manufacturing plant', 35.65940000, 139.70050000, 'Tokyo, Japan', 2, 2, 1, 1, '2025-06-24 02:44:52', NULL, 0, 275, 196, 41, 0, '2025-06-24 02:44:52', '2025-06-24 02:44:52', NULL),
 	(44, '3439b586-50a5-11f0-a415-36cb2806145a', 'Harbor Hospital Sydney', 'Medical facility with harbor views', -33.86880000, 151.20930000, 'Sydney, Australia', 1, 1, 1, 1, '2025-06-24 02:44:52', NULL, 0, 210, 102, 47, 0, '2025-06-24 02:44:52', '2025-06-24 02:44:52', NULL),
 	(45, '3439b6b2-50a5-11f0-a415-36cb2806145a', 'Opera House Mall', 'Shopping center near the famous opera house', -33.85680000, 151.21530000, 'Sydney, Australia', 5, 1, 1, 1, '2025-06-24 02:44:52', NULL, 0, 176, 117, 9, 0, '2025-06-24 02:44:52', '2025-06-24 02:44:52', NULL),
-	(46, NULL, 'Stefan', 'Bali', 42.34381161, 27.19039596, 'Lat: 42.343812, Lng: 27.190396', 8, 1, 2, 1, '2025-06-25 15:41:48', 2, 0, 36, 1, 1, 4, '2025-06-25 15:41:16', '2025-06-29 23:42:46', NULL),
+	(46, NULL, 'Stefan', 'Bali', 42.34381161, 27.19039596, 'Lat: 42.343812, Lng: 27.190396', 8, 1, 2, 1, '2025-06-25 15:41:48', 2, 0, 38, 1, 1, 4, '2025-06-25 15:41:16', '2025-07-06 13:47:20', NULL),
 	(47, NULL, 'Guy ggdhdhdhdhdhdhdhddudjdjdhdhdhdiaja uaidwbsiqxq', 'Guy ggdhdhdhdhdhdhdhddudjdjdhdhdhdiaja uaidwbsiqxqixvqbxuqbxquxbqixbwxiqbxiwbxwixbwixbwxibwixbwixbwixbwxihwxiwxiwbxwjbxwjxbwkxbwkxbwjxbwibxwixbwixvwjxbwjbxwjbx', 42.34310148, 27.18901287, 'Current Location', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-28 11:56:45', '2025-06-28 11:56:45', NULL),
 	(48, NULL, 'Guy ggdhdhdhdhdhdhdhddudjdjdhdhdhdiaja uaidwbsiqxq', 'Guy ggdhdhdhdhdhdhdhddudjdjdhdhdhdiaja uaidwbsiqxqixvqbxuqbxquxbqixbwxiqbxiwbxwixbwixbwxibwixbwixbwixbwxihwxiwxiwbxwjbxwjxbwkxbwkxbwjxbwibxwixbwixvwjxbwjbxwjbx', 42.34310148, 27.18901287, 'Current Location', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-28 11:56:45', '2025-06-28 11:56:45', NULL),
-	(49, NULL, 'Llbym dumfbdbykdvyevydvtksvyksvtjwtjevtkdvyfkysymv', 'Llbym dumfbdbykdvyevydvtksvyksvtjwtjevtkdvyfkysymvsyksbsdbykebydlbydlbckhxhlxlhlxlhclhlhcjvqktdvkydvykevykrukrurk ur ult url urlurrnulr irl ult url urlunru', 42.34495056, 27.18363819, 'Lat: 42.34495055748974, Lng: 27.18363819343972', 1, 2, 2, 1, '2025-06-28 12:44:16', 2, 0, 3, 0, 0, 0, '2025-06-28 12:43:53', '2025-06-29 13:34:15', NULL),
+	(49, NULL, 'Llbym dumfbdbykdvyevydvtksvyksvtjwtjevtkdvyfkysymv', 'Llbym dumfbdbykdvyevydvtksvyksvtjwtjevtkdvyfkysymvsyksbsdbykebydlbydlbckhxhlxlhlxlhclhlhcjvqktdvkydvykevykrukrurk ur ult url urlurrnulr irl ult url urlunru', 42.34495056, 27.18363819, 'Lat: 42.34495055748974, Lng: 27.18363819343972', 1, 2, 2, 1, '2025-06-28 12:44:16', 2, 0, 4, 0, 0, 0, '2025-06-28 12:43:53', '2025-07-02 11:52:17', NULL),
 	(52, NULL, 'Test location', 'Itcitgicigcihiggcgcigcigchchcjsvdgdhdudhdhdivjvohcohcohhchocohcohcohcohcohcohcohvohcohcohco heihcohcoh oh oh oh oh oh chichi you hchchchchchchchchchchc h', 42.34718814, 27.17621524, 'Lat: 42.34718813625099, Lng: 27.176215236569618', 6, 2, 2, 1, '2025-06-28 13:07:51', 2, 0, 3, 0, 0, 0, '2025-06-28 13:07:39', '2025-06-30 11:31:07', NULL),
 	(53, NULL, 'Test loc', 'Test dead\n\nExplored on: 28 Jun 2025\nTime of day: usk\nCompanions: 3 (Test )', 42.34197316, 27.19180132, 'Lat: 42.34197316003562, Lng: 27.191801316031643', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-29 09:46:18', '2025-06-29 09:46:18', NULL),
 	(54, NULL, 'Test loc', 'Test dead\n\nExplored on: 28 Jun 2025\nTime of day: usk\nCompanions: 3 (Test )', 42.34197316, 27.19180132, 'Lat: 42.34197316003562, Lng: 27.191801316031643', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-29 09:46:18', '2025-06-29 09:46:18', NULL),
@@ -386,8 +450,8 @@ INSERT INTO `locations` (`id`, `uuid`, `title`, `description`, `latitude`, `long
 	(58, NULL, 'Mitkooooo', 'Explored on: 30 Jun 2025\nTime of day: usk\nExplored solo', 42.33866878, 27.17469027, 'Lat: 42.338668778452586, Lng: 27.174690272925858', 1, 2, 2, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-29 11:51:56', '2025-06-29 11:51:56', NULL),
 	(59, NULL, 'Test mitko', 'Explored on: 29 Jun 2025\nTime of day: ay\nExplored solo', 42.33832236, 27.17610871, 'Lat: 42.33832235566797, Lng: 27.176108707261818', 1, 2, 2, 1, '2025-06-29 13:24:01', 2, 0, 5, 0, 0, 0, '2025-06-29 12:07:17', '2025-06-30 11:30:59', NULL),
 	(60, NULL, 'Test video', 'Explored on: 30 Jun 2025\nTime of day: ay\nExplored solo', 42.36139296, 27.22001771, 'Lat: 42.36139295944841, Lng: 27.2200177130307', 1, 2, 2, 1, '2025-06-29 15:54:44', 2, 0, 2, 0, 0, 0, '2025-06-29 15:50:39', '2025-06-29 16:03:19', NULL),
-	(61, NULL, 'Test video plus picture', 'Explored on: 30 Jun 2025\nTime of day: Dusk\nExplored solo', 42.35824033, 27.17673936, 'Lat: 42.35824033095966, Lng: 27.176739360146655', 1, 2, 2, 1, '2025-06-29 16:05:55', 2, 0, 2, 0, 0, 0, '2025-06-29 16:04:29', '2025-06-30 11:31:11', NULL),
-	(62, NULL, 'Test location danger level', 'Explored on: 29 Jun 2025\nTime of day: Night\nExplored solo', 42.35270209, 27.19636443, 'Lat: 42.352702088914185, Lng: 27.19636442890547', 1, 3, 2, 1, '2025-06-29 16:11:49', 2, 0, 1, 0, 0, 0, '2025-06-29 16:11:09', '2025-06-29 16:12:25', NULL),
+	(61, NULL, 'Test video plus picture', 'Explored on: 30 Jun 2025\nTime of day: Dusk\nExplored solo', 42.35824033, 27.17673936, 'Lat: 42.35824033095966, Lng: 27.176739360146655', 1, 2, 2, 1, '2025-06-29 16:05:55', 2, 0, 6, 0, 0, 0, '2025-06-29 16:04:29', '2025-07-02 23:10:20', NULL),
+	(62, NULL, 'Test location danger level', 'Explored on: 29 Jun 2025\nTime of day: Night\nExplored solo', 42.35270209, 27.19636443, 'Lat: 42.352702088914185, Lng: 27.19636442890547', 1, 3, 2, 1, '2025-06-29 16:11:49', 2, 0, 2, 0, 0, 0, '2025-06-29 16:11:09', '2025-07-02 23:10:28', NULL),
 	(63, NULL, 'Test test', 'Test test\n\nExplored on: 15 Jul 2025\nTime of day: Day\nExplored solo', 37.79415465, -122.39295137, 'Lat: 37.7941546505662, Lng: -122.39295136747454', 1, 1, 2, 1, '2025-06-29 16:31:35', 2, 0, 1, 0, 0, 0, '2025-06-29 16:31:05', '2025-07-01 05:26:59', NULL),
 	(64, NULL, 'Ppppp', 'Explored on: 30 Jun 2025\nTime of day: Day\nExplored solo', 42.32973608, 27.20231546, 'Lat: 42.32973607633579, Lng: 27.20231545658629', 1, 2, 1, 0, NULL, NULL, 0, 0, 0, 0, 0, '2025-06-29 21:40:08', '2025-06-29 21:40:08', NULL);
 
@@ -550,9 +614,15 @@ CREATE TABLE IF NOT EXISTS `location_videos` (
   KEY `idx_primary` (`location_id`,`is_primary`),
   CONSTRAINT `location_videos_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
   CONSTRAINT `location_videos_ibfk_2` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dumping data for table abandoned_explorer.location_videos: ~0 rows (approximately)
+-- Dumping data for table abandoned_explorer.location_videos: ~5 rows (approximately)
+INSERT INTO `location_videos` (`id`, `uuid`, `location_id`, `video_url`, `thumbnail_url`, `video_order`, `uploaded_by`, `file_size`, `duration_seconds`, `video_width`, `video_height`, `caption`, `is_primary`, `created_at`) VALUES
+	(1, NULL, 58, 'http://192.168.0.116:3000/uploads/locations/58/video_1751197924276_0.mp4', 'http://192.168.0.116:3000/uploads/locations/58/video_thumb_1751197924276_0.jpg', 0, 2, 32411224, NULL, NULL, NULL, NULL, 0, '2025-06-29 11:52:04'),
+	(2, NULL, 59, 'http://192.168.0.116:3000/uploads/locations/59/video_1751198845183_0.mp4', 'http://192.168.0.116:3000/uploads/locations/59/video_thumb_1751198845183_0.jpg', 0, 2, 18536124, NULL, NULL, NULL, NULL, 0, '2025-06-29 12:07:25'),
+	(3, NULL, 60, 'http://192.168.0.116:3000/uploads/locations/60/video_1751212243814_0.mp4', 'http://192.168.0.116:3000/uploads/locations/60/video_thumb_1751212243814_0.jpg', 0, 2, 18536124, NULL, NULL, NULL, NULL, 0, '2025-06-29 15:50:43'),
+	(4, NULL, 61, 'http://192.168.0.116:3000/uploads/locations/61/video_1751213071048_0.mp4', 'http://192.168.0.116:3000/uploads/locations/61/video_thumb_1751213071048_0.jpg', 0, 2, 4015826, NULL, NULL, NULL, NULL, 0, '2025-06-29 16:04:31'),
+	(5, NULL, 62, 'http://192.168.0.116:3000/uploads/locations/62/video_1751213472551_0.mp4', 'http://192.168.0.116:3000/uploads/locations/62/video_thumb_1751213472551_0.jpg', 0, 2, 8112144, NULL, NULL, NULL, NULL, 0, '2025-06-29 16:11:12');
 
 -- Dumping structure for table abandoned_explorer.location_visits
 CREATE TABLE IF NOT EXISTS `location_visits` (
@@ -570,9 +640,9 @@ CREATE TABLE IF NOT EXISTS `location_visits` (
   KEY `idx_user_visits` (`user_id`,`visited_at`),
   CONSTRAINT `location_visits_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE CASCADE,
   CONSTRAINT `location_visits_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=86 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dumping data for table abandoned_explorer.location_visits: ~63 rows (approximately)
+-- Dumping data for table abandoned_explorer.location_visits: ~85 rows (approximately)
 INSERT INTO `location_visits` (`id`, `uuid`, `location_id`, `user_id`, `ip_address`, `user_agent`, `visited_at`) VALUES
 	(1, NULL, 7, NULL, '::ffff:192.168.0.116', 'upwork-project/1 CFNetwork/3826.500.131 Darwin/25.0.0', '2025-06-27 09:49:54'),
 	(2, NULL, 46, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-27 09:54:38'),
@@ -642,7 +712,23 @@ INSERT INTO `location_visits` (`id`, `uuid`, `location_id`, `user_id`, `ip_addre
 	(66, NULL, 61, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-30 11:31:11'),
 	(67, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-30 11:33:16'),
 	(68, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-06-30 23:03:10'),
-	(69, NULL, 63, NULL, '::ffff:192.168.0.116', 'upwork-project/1 CFNetwork/3826.500.131 Darwin/25.0.0', '2025-07-01 05:26:59');
+	(69, NULL, 63, NULL, '::ffff:192.168.0.116', 'upwork-project/1 CFNetwork/3826.500.131 Darwin/25.0.0', '2025-07-01 05:26:59'),
+	(70, NULL, 4, NULL, '::ffff:192.168.0.116', 'upwork-project/1 CFNetwork/3826.500.131 Darwin/25.0.0', '2025-07-02 08:40:53'),
+	(71, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-07-02 08:50:53'),
+	(72, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-07-02 08:59:02'),
+	(73, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-07-02 09:05:39'),
+	(74, NULL, 61, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-07-02 09:05:44'),
+	(75, NULL, 61, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3852.100.1 Darwin/25.0.0', '2025-07-02 09:15:04'),
+	(76, NULL, 49, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3855.100.1 Darwin/25.0.0', '2025-07-02 11:52:17'),
+	(77, NULL, 61, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3855.100.1 Darwin/25.0.0', '2025-07-02 11:52:20'),
+	(78, NULL, 46, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3855.100.1 Darwin/25.0.0', '2025-07-02 11:59:01'),
+	(79, NULL, 1, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3855.100.1 Darwin/25.0.0', '2025-07-02 11:59:23'),
+	(80, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3855.100.1 Darwin/25.0.0', '2025-07-02 11:59:27'),
+	(81, NULL, 61, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3855.100.1 Darwin/25.0.0', '2025-07-02 23:10:20'),
+	(82, NULL, 62, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3855.100.1 Darwin/25.0.0', '2025-07-02 23:10:28'),
+	(83, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3855.100.1 Darwin/25.0.0', '2025-07-04 12:43:33'),
+	(84, NULL, 4, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3855.100.1 Darwin/25.0.0', '2025-07-06 13:47:14'),
+	(85, NULL, 46, NULL, '::ffff:192.168.0.108', 'upwork-project/1 CFNetwork/3855.100.1 Darwin/25.0.0', '2025-07-06 13:47:20');
 
 -- Dumping structure for table abandoned_explorer.notifications
 CREATE TABLE IF NOT EXISTS `notifications` (
@@ -651,8 +737,8 @@ CREATE TABLE IF NOT EXISTS `notifications` (
   `user_id` int(11) NOT NULL,
   `title` varchar(255) NOT NULL,
   `message` text NOT NULL,
-  `type` enum('like','comment','bookmark','approval','rejection','submission','reply','visit','system','follow','mention') NOT NULL,
-  `related_type` enum('location','comment','user','submission') DEFAULT NULL,
+  `type` enum('like','comment','bookmark','approval','rejection','submission','reply','visit','system','follow','mention','group_join','group_leave','group_kick','group_ban','group_unban','group_promote','group_demote','group_member_kick','group_member_ban','group_member_role_change') NOT NULL,
+  `related_type` enum('location','comment','user','submission','group') DEFAULT NULL,
   `related_id` int(11) DEFAULT NULL,
   `triggered_by` int(11) DEFAULT NULL,
   `data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`data`)),
@@ -668,17 +754,20 @@ CREATE TABLE IF NOT EXISTS `notifications` (
   KEY `idx_related` (`related_type`,`related_id`),
   CONSTRAINT `notifications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `notifications_ibfk_2` FOREIGN KEY (`triggered_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dumping data for table abandoned_explorer.notifications: ~7 rows (approximately)
+-- Dumping data for table abandoned_explorer.notifications: ~10 rows (approximately)
 INSERT INTO `notifications` (`id`, `uuid`, `user_id`, `title`, `message`, `type`, `related_type`, `related_id`, `triggered_by`, `data`, `is_read`, `created_at`) VALUES
 	(1, NULL, 1, 'New Comment', 'admin commented on your location', 'comment', 'location', 4, NULL, NULL, 1, '2025-06-27 11:41:05'),
 	(2, NULL, 1, 'New Comment', 'admin commented on your location', 'comment', 'location', 4, NULL, NULL, 1, '2025-06-27 12:31:52'),
-	(3, NULL, 1, 'New Comment', 'admin commented on your location', 'comment', 'location', 4, NULL, NULL, 0, '2025-06-27 12:57:45'),
-	(4, NULL, 1, 'New Comment', 'admin commented on your location', 'comment', 'location', 4, NULL, NULL, 0, '2025-06-27 12:59:51'),
+	(3, NULL, 1, 'New Comment', 'admin commented on your location', 'comment', 'location', 4, NULL, NULL, 1, '2025-06-27 12:57:45'),
+	(4, NULL, 1, 'New Comment', 'admin commented on your location', 'comment', 'location', 4, NULL, NULL, 1, '2025-06-27 12:59:51'),
 	(5, NULL, 1, 'Location Submitted', 'Your location "Ppppp" has been submitted for review', 'submission', 'location', 64, NULL, '{"locationTitle":"Ppppp","status":"pending_approval"}', 1, '2025-06-29 21:40:08'),
 	(6, NULL, 2, 'New Comment', 'test commented on your location "Stefan"', 'comment', 'location', 46, 1, '{"locationTitle":"Stefan","commenterUsername":"test","commentText":"Test"}', 1, '2025-06-29 21:40:42'),
-	(7, NULL, 2, 'New Reply', 'test replied to your comment', 'reply', 'comment', 1, 1, '{"locationTitle":"Stefan","commenterUsername":"test","replyText":"Test"}', 1, '2025-06-29 21:40:42');
+	(7, NULL, 2, 'New Reply', 'test replied to your comment', 'reply', 'comment', 1, 1, '{"locationTitle":"Stefan","commenterUsername":"test","replyText":"Test"}', 1, '2025-06-29 21:40:42'),
+	(9, NULL, 1, 'Member Joined', 'admin joined Test Group', 'group_join', 'group', 1, 2, '{"groupName":"Test Group","newMemberUsername":"admin"}', 1, '2025-07-02 10:06:12'),
+	(10, NULL, 2, 'Role Changed', 'Your role in Test has been changed from member to admin by test', 'group_promote', 'group', 7, 1, '{"groupName":"Test","adminUsername":"test","oldRole":"member","newRole":"admin"}', 0, '2025-07-02 10:11:28'),
+	(11, NULL, 2, 'Role Changed', 'Your role in Test has been changed from admin to member by test', 'group_demote', 'group', 7, 1, '{"groupName":"Test","adminUsername":"test","oldRole":"admin","newRole":"member"}', 0, '2025-07-02 10:11:51');
 
 -- Dumping structure for table abandoned_explorer.reports
 CREATE TABLE IF NOT EXISTS `reports` (
@@ -754,6 +843,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `age` int(11) DEFAULT NULL,
   `is_premium` tinyint(1) DEFAULT 0,
   `profile_image_url` varchar(500) DEFAULT NULL,
+  `region` varchar(50) DEFAULT 'Unknown',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `last_login` timestamp NULL DEFAULT NULL,
@@ -772,153 +862,154 @@ CREATE TABLE IF NOT EXISTS `users` (
   KEY `idx_created_at` (`created_at`),
   KEY `idx_email_verified` (`email_verified`),
   KEY `idx_last_login` (`last_login`),
-  KEY `idx_active_status` (`is_active`,`last_login`)
+  KEY `idx_active_status` (`is_active`,`last_login`),
+  KEY `idx_region` (`region`)
 ) ENGINE=InnoDB AUTO_INCREMENT=351 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Dumping data for table abandoned_explorer.users: ~142 rows (approximately)
-INSERT INTO `users` (`id`, `uuid`, `username`, `email`, `password_hash`, `age`, `is_premium`, `profile_image_url`, `created_at`, `updated_at`, `last_login`, `is_active`, `email_verified`, `phone_number`, `bio`) VALUES
-	(1, NULL, 'test', 'test@test.com', '$2a$12$v5CguxvZGnoz3/rd18WWWu1QvgUkfgjczZk7ah8FxbZJZgs1XmOwG', 18, 0, NULL, '2025-06-22 23:49:51', '2025-06-30 23:01:34', '2025-06-30 23:01:34', 1, 0, NULL, NULL),
-	(2, NULL, 'admin', 'admin@admin.com', '$2a$12$v5gBvVxl6dlJkqmtLaxXSO6KdZGuSbn9iwATEh2js7caXpbphKNx.', 18, 0, NULL, '2025-06-23 01:10:05', '2025-07-01 05:31:47', '2025-07-01 05:31:47', 1, 0, NULL, NULL),
-	(18, NULL, 'alex_nyc', 'alex@example.com', '$2b$10$hash1', NULL, 1, 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 12:22:22', 1, 0, NULL, NULL),
-	(19, NULL, 'maria_london', 'maria@example.com', '$2b$10$hash2', NULL, 0, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100', '2025-06-24 11:56:40', '2025-06-25 12:20:22', '2025-06-25 12:20:22', 1, 0, NULL, NULL),
-	(20, NULL, 'tom_paris', 'tom@example.com', '$2b$10$hash3', NULL, 1, 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', '2025-06-24 11:56:40', '2025-06-25 12:18:22', '2025-06-25 12:18:22', 1, 0, NULL, NULL),
-	(21, NULL, 'sarah_tokyo', 'sarah@example.com', '$2b$10$hash4', NULL, 0, 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', '2025-06-24 11:56:40', '2025-06-25 12:15:22', '2025-06-25 12:15:22', 1, 0, NULL, NULL),
-	(22, NULL, 'david_sydney', 'david@example.com', '$2b$10$hash5', NULL, 1, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:10:22', '2025-06-25 12:10:22', 1, 0, NULL, NULL),
-	(23, NULL, 'emma_berlin', 'emma@example.com', '$2b$10$hash6', NULL, 0, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', '2025-06-24 11:56:40', '2025-06-25 12:05:22', '2025-06-25 12:05:22', 1, 0, NULL, NULL),
-	(24, NULL, 'james_toronto', 'james@example.com', '$2b$10$hash7', NULL, 1, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', '2025-06-24 11:56:40', '2025-06-25 12:00:22', '2025-06-25 12:00:22', 1, 0, NULL, NULL),
-	(25, NULL, 'lisa_amsterdam', 'lisa@example.com', '$2b$10$hash8', NULL, 0, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', '2025-06-24 11:56:40', '2025-06-25 11:55:22', '2025-06-25 11:55:22', 1, 0, NULL, NULL),
-	(26, NULL, 'mike_chicago', 'mike@example.com', '$2b$10$hash9', NULL, 1, 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=100', '2025-06-24 11:56:40', '2025-06-25 11:50:22', '2025-06-25 11:50:22', 1, 0, NULL, NULL),
-	(27, NULL, 'anna_madrid', 'anna@example.com', '$2b$10$hash10', NULL, 0, 'https://images.unsplash.com/photo-1502764613149-7f1d229e230f?w=100', '2025-06-24 11:56:40', '2025-06-25 11:45:22', '2025-06-25 11:45:22', 1, 0, NULL, NULL),
-	(28, NULL, 'john_vancouver', 'john@example.com', '$2b$10$hash11', NULL, 0, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', '2025-06-24 11:56:40', '2025-06-25 11:40:22', '2025-06-25 11:40:22', 1, 0, NULL, NULL),
-	(29, NULL, 'sophie_rome', 'sophie@example.com', '$2b$10$hash12', NULL, 1, 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=100', '2025-06-24 11:56:40', '2025-06-25 11:35:22', '2025-06-25 11:35:22', 1, 0, NULL, NULL),
-	(30, NULL, 'carlos_barcelona', 'carlos@example.com', '$2b$10$hash13', NULL, 0, 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100', '2025-06-24 11:56:40', '2025-06-25 11:30:22', '2025-06-25 11:30:22', 1, 0, NULL, NULL),
-	(31, NULL, 'nina_vienna', 'nina@example.com', '$2b$10$hash14', NULL, 1, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', '2025-06-24 11:56:40', '2025-06-25 11:25:22', '2025-06-25 11:25:22', 1, 0, NULL, NULL),
-	(32, NULL, 'peter_moscow', 'peter@example.com', '$2b$10$hash15', NULL, 0, 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100', '2025-06-24 11:56:40', '2025-06-25 11:20:22', '2025-06-25 11:20:22', 1, 0, NULL, NULL),
-	(33, NULL, 'chloe_zurich', 'chloe@example.com', '$2b$10$hash16', NULL, 1, 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=100', '2025-06-24 11:56:40', '2025-06-25 11:15:22', '2025-06-25 11:15:22', 1, 0, NULL, NULL),
-	(34, NULL, 'lucas_melbourne', 'lucas@example.com', '$2b$10$hash17', NULL, 0, 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100', '2025-06-24 11:56:40', '2025-06-25 11:10:22', '2025-06-25 11:10:22', 1, 0, NULL, NULL),
-	(35, NULL, 'grace_oslo', 'grace@example.com', '$2b$10$hash18', NULL, 1, 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100', '2025-06-24 11:56:40', '2025-06-25 11:05:22', '2025-06-25 11:05:22', 1, 0, NULL, NULL),
-	(36, NULL, 'ryan_dublin', 'ryan@example.com', '$2b$10$hash19', NULL, 0, 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=100', '2025-06-24 11:56:40', '2025-06-25 11:00:22', '2025-06-25 11:00:22', 1, 0, NULL, NULL),
-	(37, NULL, 'zoe_stockholm', 'zoe@example.com', '$2b$10$hash20', NULL, 1, 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=100', '2025-06-24 11:56:40', '2025-06-25 10:55:22', '2025-06-25 10:55:22', 1, 0, NULL, NULL),
-	(38, NULL, 'ben_brussels', 'ben@example.com', '$2b$10$hash21', NULL, 0, 'https://images.unsplash.com/photo-1557862921-37829c790f19?w=100', '2025-06-24 11:56:40', '2025-06-25 10:50:22', '2025-06-25 10:50:22', 1, 0, NULL, NULL),
-	(39, NULL, 'mia_copenhagen', 'mia@example.com', '$2b$10$hash22', NULL, 1, 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100', '2025-06-24 11:56:40', '2025-06-25 10:45:22', '2025-06-25 10:45:22', 1, 0, NULL, NULL),
-	(40, NULL, 'noah_helsinki', 'noah@example.com', '$2b$10$hash23', NULL, 0, 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?w=100', '2025-06-24 11:56:40', '2025-06-25 10:40:22', '2025-06-25 10:40:22', 1, 0, NULL, NULL),
-	(41, NULL, 'eva_budapest', 'eva@example.com', '$2b$10$hash24', NULL, 1, 'https://images.unsplash.com/photo-1616766098956-c81f12114571?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:07:22', 1, 0, NULL, NULL),
-	(42, NULL, 'leo_prague', 'leo@example.com', '$2b$10$hash25', NULL, 0, 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:32:22', 1, 0, NULL, NULL),
-	(43, NULL, 'isla_warsaw', 'isla@example.com', '$2b$10$hash26', NULL, 1, 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:31:22', 1, 0, NULL, NULL),
-	(44, NULL, 'finn_munich', 'finn@example.com', '$2b$10$hash27', NULL, 0, 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:21:22', 1, 0, NULL, NULL),
-	(45, NULL, 'ruby_milan', 'ruby@example.com', '$2b$10$hash28', NULL, 1, 'https://images.unsplash.com/photo-1616766098956-c81f12114571?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:46:22', 1, 0, NULL, NULL),
-	(46, NULL, 'oscar_lisbon', 'oscar@example.com', '$2b$10$hash29', NULL, 0, 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:16:22', 1, 0, NULL, NULL),
-	(47, NULL, 'ivy_athens', 'ivy@example.com', '$2b$10$hash30', NULL, 1, 'https://images.unsplash.com/photo-1508186225823-0963cf9ab0de?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:56:22', 1, 0, NULL, NULL),
-	(48, NULL, 'jake_la', 'jake@example.com', '$2b$10$hash31', NULL, 0, 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:52:22', 1, 0, NULL, NULL),
-	(49, NULL, 'lily_miami', 'lily@example.com', '$2b$10$hash32', NULL, 1, 'https://images.unsplash.com/photo-1525134479668-1bee5c7c6845?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:42:22', 1, 0, NULL, NULL),
-	(50, NULL, 'ethan_denver', 'ethan@example.com', '$2b$10$hash33', NULL, 0, 'https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:32:22', 1, 0, NULL, NULL),
-	(51, NULL, 'ava_seattle', 'ava@example.com', '$2b$10$hash34', NULL, 1, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:47:22', 1, 0, NULL, NULL),
-	(52, NULL, 'owen_houston', 'owen@example.com', '$2b$10$hash35', NULL, 0, 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:02:22', 1, 0, NULL, NULL),
-	(53, NULL, 'maya_phoenix', 'maya@example.com', '$2b$10$hash36', NULL, 1, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:57:22', 1, 0, NULL, NULL),
-	(54, NULL, 'liam_boston', 'liam@example.com', '$2b$10$hash37', NULL, 0, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:27:22', 1, 0, NULL, NULL),
-	(55, NULL, 'nora_atlanta', 'nora@example.com', '$2b$10$hash38', NULL, 1, 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:37:22', 1, 0, NULL, NULL),
-	(56, NULL, 'theo_portland', 'theo@example.com', '$2b$10$hash39', NULL, 0, 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:51:22', 1, 0, NULL, NULL),
-	(57, NULL, 'zara_vegas', 'zara@example.com', '$2b$10$hash40', NULL, 1, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:41:22', 1, 0, NULL, NULL),
-	(58, NULL, 'kenji_osaka', 'kenji@example.com', '$2b$10$hash41', NULL, 0, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 12:02:22', 1, 0, NULL, NULL),
-	(59, NULL, 'yuki_seoul', 'yuki@example.com', '$2b$10$hash42', NULL, 1, 'https://images.unsplash.com/photo-1502764613149-7f1d229e230f?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:52:22', 1, 0, NULL, NULL),
-	(60, NULL, 'chen_beijing', 'chen@example.com', '$2b$10$hash43', NULL, 0, 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:42:22', 1, 0, NULL, NULL),
-	(61, NULL, 'priya_mumbai', 'priya@example.com', '$2b$10$hash44', NULL, 1, 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:32:22', 1, 0, NULL, NULL),
-	(62, NULL, 'raj_bangalore', 'raj@example.com', '$2b$10$hash45', NULL, 0, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:22:22', 1, 0, NULL, NULL),
-	(63, NULL, 'ming_shanghai', 'ming@example.com', '$2b$10$hash46', NULL, 1, 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:21:22', 1, 0, NULL, NULL),
-	(64, NULL, 'siti_jakarta', 'siti@example.com', '$2b$10$hash47', NULL, 0, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:11:22', 1, 0, NULL, NULL),
-	(65, NULL, 'kumar_delhi', 'kumar@example.com', '$2b$10$hash48', NULL, 1, 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:01:22', 1, 0, NULL, NULL),
-	(66, NULL, 'lin_taipei', 'lin@example.com', '$2b$10$hash49', NULL, 0, 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:31:22', 1, 0, NULL, NULL),
-	(67, NULL, 'aaron_singapore', 'aaron@example.com', '$2b$10$hash50', NULL, 1, 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:46:22', 1, 0, NULL, NULL),
-	(68, NULL, 'amara_cairo', 'amara@example.com', '$2b$10$hash51', NULL, 0, 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:36:22', 1, 0, NULL, NULL),
-	(69, NULL, 'omar_dubai', 'omar@example.com', '$2b$10$hash52', NULL, 1, 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:26:22', 1, 0, NULL, NULL),
-	(70, NULL, 'fatima_riyadh', 'fatima@example.com', '$2b$10$hash53', NULL, 0, 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:16:22', 1, 0, NULL, NULL),
-	(71, NULL, 'hassan_istanbul', 'hassan@example.com', '$2b$10$hash54', NULL, 1, 'https://images.unsplash.com/photo-1557862921-37829c790f19?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:31:22', 1, 0, NULL, NULL),
-	(72, NULL, 'kemi_lagos', 'kemi@example.com', '$2b$10$hash55', NULL, 0, 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:21:22', 1, 0, NULL, NULL),
-	(73, NULL, 'thandiwe_johannesburg', 'thandiwe@example.com', '$2b$10$hash56', NULL, 1, 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:41:22', 1, 0, NULL, NULL),
-	(74, NULL, 'youssef_casablanca', 'youssef@example.com', '$2b$10$hash57', NULL, 0, 'https://images.unsplash.com/photo-1616766098956-c81f12114571?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:51:22', 1, 0, NULL, NULL),
-	(75, NULL, 'aisha_nairobi', 'aisha@example.com', '$2b$10$hash58', NULL, 1, 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:11:22', 1, 0, NULL, NULL),
-	(76, NULL, 'tariq_tehran', 'tariq@example.com', '$2b$10$hash59', NULL, 0, 'https://images.unsplash.com/photo-1508186225823-0963cf9ab0de?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:01:22', 1, 0, NULL, NULL),
-	(77, NULL, 'zara_doha', 'zara2@example.com', '$2b$10$hash60', NULL, 1, 'https://images.unsplash.com/photo-1504593811423-6dd665756598?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:01:22', 1, 0, NULL, NULL),
-	(78, NULL, 'diego_mexico_city', 'diego@example.com', '$2b$10$hash61', NULL, 0, 'https://images.unsplash.com/photo-1521119989659-a83eee488004?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:42:22', 1, 0, NULL, NULL),
-	(79, NULL, 'sofia_buenos_aires', 'sofia@example.com', '$2b$10$hash62', NULL, 1, 'https://images.unsplash.com/photo-1558203728-00f45181dd84?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:32:22', 1, 0, NULL, NULL),
-	(80, NULL, 'ricardo_sao_paulo', 'ricardo@example.com', '$2b$10$hash63', NULL, 0, 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:22:22', 1, 0, NULL, NULL),
-	(81, NULL, 'valeria_lima', 'valeria@example.com', '$2b$10$hash64', NULL, 1, 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:46:22', 1, 0, NULL, NULL),
-	(82, NULL, 'carlos_bogota', 'carlos2@example.com', '$2b$10$hash65', NULL, 0, 'https://images.unsplash.com/photo-1525134479668-1bee5c7c6845?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:36:22', 1, 0, NULL, NULL),
-	(83, NULL, 'lucia_santiago', 'lucia@example.com', '$2b$10$hash66', NULL, 1, 'https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:26:22', 1, 0, NULL, NULL),
-	(84, NULL, 'pablo_caracas', 'pablo@example.com', '$2b$10$hash67', NULL, 0, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:16:22', 1, 0, NULL, NULL),
-	(85, NULL, 'isabella_quito', 'isabella@example.com', '$2b$10$hash68', NULL, 1, 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:31:22', 1, 0, NULL, NULL),
-	(86, NULL, 'mateo_montevideo', 'mateo@example.com', '$2b$10$hash69', NULL, 0, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:21:22', 1, 0, NULL, NULL),
-	(87, NULL, 'camila_la_paz', 'camila@example.com', '$2b$10$hash70', NULL, 1, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:41:22', 1, 0, NULL, NULL),
-	(88, NULL, 'brandon_dallas', 'brandon@example.com', '$2b$10$hash71', NULL, 0, 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:11:22', 1, 0, NULL, NULL),
-	(89, NULL, 'taylor_detroit', 'taylor@example.com', '$2b$10$hash72', NULL, 1, 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:01:22', 1, 0, NULL, NULL),
-	(90, NULL, 'jordan_philadelphia', 'jordan@example.com', '$2b$10$hash73', NULL, 0, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:51:22', 1, 0, NULL, NULL),
-	(91, NULL, 'riley_nashville', 'riley@example.com', '$2b$10$hash74', NULL, 1, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:41:22', 1, 0, NULL, NULL),
-	(92, NULL, 'casey_sacramento', 'casey@example.com', '$2b$10$hash75', NULL, 0, 'https://images.unsplash.com/photo-1502764613149-7f1d229e230f?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:31:22', 1, 0, NULL, NULL),
-	(93, NULL, 'jamie_salt_lake', 'jamie@example.com', '$2b$10$hash76', NULL, 1, 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:21:22', 1, 0, NULL, NULL),
-	(94, NULL, 'alex_minneapolis', 'alex2@example.com', '$2b$10$hash77', NULL, 0, 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:11:22', 1, 0, NULL, NULL),
-	(95, NULL, 'drew_kansas_city', 'drew@example.com', '$2b$10$hash78', NULL, 1, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:21:22', 1, 0, NULL, NULL),
-	(96, NULL, 'sage_richmond', 'sage@example.com', '$2b$10$hash79', NULL, 0, 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:01:22', 1, 0, NULL, NULL),
-	(97, NULL, 'river_charlotte', 'river@example.com', '$2b$10$hash80', NULL, 1, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:31:22', 1, 0, NULL, NULL),
-	(98, NULL, 'jackson_auckland', 'jackson@example.com', '$2b$10$hash81', NULL, 0, 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:22:22', 1, 0, NULL, NULL),
-	(99, NULL, 'harper_wellington', 'harper@example.com', '$2b$10$hash82', NULL, 1, 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:12:22', 1, 0, NULL, NULL),
-	(100, NULL, 'mason_brisbane', 'mason@example.com', '$2b$10$hash83', NULL, 0, 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:36:22', 1, 0, NULL, NULL),
-	(101, NULL, 'ella_perth', 'ella@example.com', '$2b$10$hash84', NULL, 1, 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:26:22', 1, 0, NULL, NULL),
-	(102, NULL, 'logan_adelaide', 'logan@example.com', '$2b$10$hash85', NULL, 0, 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:16:22', 1, 0, NULL, NULL),
-	(103, NULL, 'felix_florence', 'felix@example.com', '$2b$10$hash86', NULL, 1, 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:11:22', 1, 0, NULL, NULL),
-	(104, NULL, 'luna_venice', 'luna@example.com', '$2b$10$hash87', NULL, 0, 'https://images.unsplash.com/photo-1557862921-37829c790f19?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:01:22', 1, 0, NULL, NULL),
-	(105, NULL, 'hugo_lyon', 'hugo@example.com', '$2b$10$hash88', NULL, 1, 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:51:22', 1, 0, NULL, NULL),
-	(106, NULL, 'clara_marseille', 'clara@example.com', '$2b$10$hash89', NULL, 0, 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:41:22', 1, 0, NULL, NULL),
-	(107, NULL, 'axel_gothenburg', 'axel@example.com', '$2b$10$hash90', NULL, 1, 'https://images.unsplash.com/photo-1616766098956-c81f12114571?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:31:22', 1, 0, NULL, NULL),
-	(108, NULL, 'natalie_edinburgh', 'natalie@example.com', '$2b$10$hash91', 25, 0, 'https://images.unsplash.com/photo-1506629905607-19e1469a4ec7?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:21:22', 1, 0, NULL, NULL),
-	(109, NULL, 'sebastian_leeds', 'sebastian@example.com', '$2b$10$hash92', 31, 1, 'https://images.unsplash.com/photo-1522075469751-3847faf9d35a?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:11:22', 1, 0, NULL, NULL),
-	(110, NULL, 'aurora_reykjavik', 'aurora@example.com', '$2b$10$hash93', 28, 0, 'https://images.unsplash.com/photo-1513956589380-bad6acb9b9d4?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:45:22', 1, 0, NULL, NULL),
-	(111, NULL, 'dante_rome', 'dante@example.com', '$2b$10$hash94', 33, 1, 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:35:22', 1, 0, NULL, NULL),
-	(112, NULL, 'valentina_naples', 'valentina@example.com', '$2b$10$hash95', 26, 0, 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:25:22', 1, 0, NULL, NULL),
-	(113, NULL, 'viktor_kiev', 'viktor@example.com', '$2b$10$hash96', 29, 1, 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:15:22', 1, 0, NULL, NULL),
-	(114, NULL, 'anastasia_minsk', 'anastasia@example.com', '$2b$10$hash97', 24, 0, 'https://images.unsplash.com/photo-1544345240-3f7ed06b5c95?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:55:22', 1, 0, NULL, NULL),
-	(115, NULL, 'lars_bergen', 'lars@example.com', '$2b$10$hash98', 32, 1, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:05:22', 1, 0, NULL, NULL),
-	(116, NULL, 'ingrid_malmo', 'ingrid@example.com', '$2b$10$hash99', 27, 0, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:55:22', 1, 0, NULL, NULL),
-	(117, NULL, 'mikhail_riga', 'mikhail@example.com', '$2b$10$hash100', 30, 1, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:45:22', 1, 0, NULL, NULL),
-	(118, NULL, 'elena_tallinn', 'elena@example.com', '$2b$10$hash101', 26, 0, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:35:22', 1, 0, NULL, NULL),
-	(119, NULL, 'magnus_trondheim', 'magnus@example.com', '$2b$10$hash102', 34, 1, 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:25:22', 1, 0, NULL, NULL),
-	(120, NULL, 'astrid_stavanger', 'astrid@example.com', '$2b$10$hash103', 23, 0, 'https://images.unsplash.com/photo-1502764613149-7f1d229e230f?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:15:22', 1, 0, NULL, NULL),
-	(121, NULL, 'erik_aalborg', 'erik@example.com', '$2b$10$hash104', 28, 1, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:05:22', 1, 0, NULL, NULL),
-	(122, NULL, 'freya_aarhus', 'freya@example.com', '$2b$10$hash105', 29, 0, 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:55:22', 1, 0, NULL, NULL),
-	(123, NULL, 'niko_tampere', 'niko@example.com', '$2b$10$hash106', 31, 1, 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:45:22', 1, 0, NULL, NULL),
-	(124, NULL, 'aino_turku', 'aino@example.com', '$2b$10$hash107', 25, 0, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:35:22', 1, 0, NULL, NULL),
-	(125, NULL, 'gustav_linkoping', 'gustav@example.com', '$2b$10$hash108', 33, 1, 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:25:22', 1, 0, NULL, NULL),
-	(126, NULL, 'saga_uppsala', 'saga@example.com', '$2b$10$hash109', 27, 0, 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:15:22', 1, 0, NULL, NULL),
-	(127, NULL, 'anton_vilnius', 'anton@example.com', '$2b$10$hash110', 30, 1, 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:05:22', 1, 0, NULL, NULL),
-	(128, NULL, 'ruta_kaunas', 'ruta@example.com', '$2b$10$hash111', 26, 0, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:55:22', 1, 0, NULL, NULL),
-	(129, NULL, 'matteo_bologna', 'matteo@example.com', '$2b$10$hash112', 28, 1, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:45:22', 1, 0, NULL, NULL),
-	(130, NULL, 'giulia_turin', 'giulia@example.com', '$2b$10$hash113', 24, 0, 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:35:22', 1, 0, NULL, NULL),
-	(131, NULL, 'alessandro_genoa', 'alessandro@example.com', '$2b$10$hash114', 32, 1, 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:25:22', 1, 0, NULL, NULL),
-	(132, NULL, 'francesca_palermo', 'francesca@example.com', '$2b$10$hash115', 29, 0, 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:15:22', 1, 0, NULL, NULL),
-	(133, NULL, 'hans_salzburg', 'hans@example.com', '$2b$10$hash116', 35, 1, 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:05:22', 1, 0, NULL, NULL),
-	(134, NULL, 'liesel_graz', 'liesel@example.com', '$2b$10$hash117', 27, 0, 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:55:22', 1, 0, NULL, NULL),
-	(135, NULL, 'wolfgang_innsbruck', 'wolfgang@example.com', '$2b$10$hash118', 31, 1, 'https://images.unsplash.com/photo-1557862921-37829c790f19?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:45:22', 1, 0, NULL, NULL),
-	(136, NULL, 'brigitte_linz', 'brigitte@example.com', '$2b$10$hash119', 28, 0, 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:35:22', 1, 0, NULL, NULL),
-	(137, NULL, 'jean_lyon', 'jean@example.com', '$2b$10$hash120', 33, 1, 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:25:22', 1, 0, NULL, NULL),
-	(138, NULL, 'marie_toulouse', 'marie@example.com', '$2b$10$hash121', 26, 0, 'https://images.unsplash.com/photo-1616766098956-c81f12114571?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:15:22', 1, 0, NULL, NULL),
-	(139, NULL, 'pierre_bordeaux', 'pierre@example.com', '$2b$10$hash122', 30, 1, 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:05:22', 1, 0, NULL, NULL),
-	(140, NULL, 'camille_nantes', 'camille@example.com', '$2b$10$hash123', 25, 0, 'https://images.unsplash.com/photo-1508186225823-0963cf9ab0de?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:55:22', 1, 0, NULL, NULL),
-	(141, NULL, 'henri_strasbourg', 'henri@example.com', '$2b$10$hash124', 34, 1, 'https://images.unsplash.com/photo-1504593811423-6dd665756598?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:45:22', 1, 0, NULL, NULL),
-	(142, NULL, 'claire_nice', 'claire@example.com', '$2b$10$hash125', 27, 0, 'https://images.unsplash.com/photo-1521119989659-a83eee488004?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:35:22', 1, 0, NULL, NULL),
-	(143, NULL, 'diego_valencia', 'diego2@example.com', '$2b$10$hash126', 29, 1, 'https://images.unsplash.com/photo-1558203728-00f45181dd84?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:25:22', 1, 0, NULL, NULL),
-	(144, NULL, 'carmen_seville', 'carmen@example.com', '$2b$10$hash127', 31, 0, 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:15:22', 1, 0, NULL, NULL),
-	(145, NULL, 'javier_bilbao', 'javier@example.com', '$2b$10$hash128', 28, 1, 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:05:22', 1, 0, NULL, NULL),
-	(146, NULL, 'lucia_zaragoza', 'lucia2@example.com', '$2b$10$hash129', 26, 0, 'https://images.unsplash.com/photo-1525134479668-1bee5c7c6845?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:55:22', 1, 0, NULL, NULL),
-	(147, NULL, 'pablo_murcia', 'pablo2@example.com', '$2b$10$hash130', 32, 1, 'https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:45:22', 1, 0, NULL, NULL),
-	(148, NULL, 'ines_cordoba', 'ines@example.com', '$2b$10$hash131', 24, 0, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:35:22', 1, 0, NULL, NULL),
-	(149, NULL, 'hugo_braga', 'hugo2@example.com', '$2b$10$hash132', 30, 1, 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:25:22', 1, 0, NULL, NULL),
-	(150, NULL, 'ana_braga', 'ana@example.com', '$2b$10$hash133', 27, 0, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:15:22', 1, 0, NULL, NULL),
-	(151, NULL, 'carlos_coimbra', 'carlos3@example.com', '$2b$10$hash134', 29, 1, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:05:22', 1, 0, NULL, NULL),
-	(152, NULL, 'beatriz_funchal', 'beatriz@example.com', '$2b$10$hash135', 25, 0, 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:55:22', 1, 0, NULL, NULL),
-	(153, NULL, 'rodrigo_aveiro', 'rodrigo@example.com', '$2b$10$hash136', 33, 1, 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:45:22', 1, 0, NULL, NULL),
-	(154, NULL, 'marta_faro', 'marta@example.com', '$2b$10$hash137', 28, 0, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:35:22', 1, 0, NULL, NULL),
-	(155, NULL, 'ivan_split', 'ivan@example.com', '$2b$10$hash138', 31, 1, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:25:22', 1, 0, NULL, NULL),
-	(156, NULL, 'ana_zagreb', 'ana2@example.com', '$2b$10$hash139', 26, 0, 'https://images.unsplash.com/photo-1502764613149-7f1d229e230f?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:15:22', 1, 0, NULL, NULL),
-	(157, NULL, 'marko_rijeka', 'marko@example.com', '$2b$10$hash140', 34, 1, 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=100', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:05:22', 1, 0, NULL, NULL);
+INSERT INTO `users` (`id`, `uuid`, `username`, `email`, `password_hash`, `age`, `is_premium`, `profile_image_url`, `region`, `created_at`, `updated_at`, `last_login`, `is_active`, `email_verified`, `phone_number`, `bio`) VALUES
+	(1, NULL, 'test', 'test@test.com', '$2a$12$v5CguxvZGnoz3/rd18WWWu1QvgUkfgjczZk7ah8FxbZJZgs1XmOwG', 18, 0, NULL, 'EU', '2025-06-22 23:49:51', '2025-07-06 18:10:43', '2025-07-06 18:10:43', 1, 0, NULL, NULL),
+	(2, NULL, 'admin', 'admin@admin.com', '$2a$12$v5gBvVxl6dlJkqmtLaxXSO6KdZGuSbn9iwATEh2js7caXpbphKNx.', 18, 0, NULL, 'US', '2025-06-23 01:10:05', '2025-07-06 17:31:57', '2025-07-06 17:31:57', 1, 0, NULL, NULL),
+	(18, NULL, 'alex_nyc', 'alex@example.com', '$2b$10$hash1', NULL, 1, 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 12:22:22', 1, 0, NULL, NULL),
+	(19, NULL, 'maria_london', 'maria@example.com', '$2b$10$hash2', NULL, 0, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:20:22', '2025-06-25 12:20:22', 1, 0, NULL, NULL),
+	(20, NULL, 'tom_paris', 'tom@example.com', '$2b$10$hash3', NULL, 1, 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:18:22', '2025-06-25 12:18:22', 1, 0, NULL, NULL),
+	(21, NULL, 'sarah_tokyo', 'sarah@example.com', '$2b$10$hash4', NULL, 0, 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:15:22', '2025-06-25 12:15:22', 1, 0, NULL, NULL),
+	(22, NULL, 'david_sydney', 'david@example.com', '$2b$10$hash5', NULL, 1, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:10:22', '2025-06-25 12:10:22', 1, 0, NULL, NULL),
+	(23, NULL, 'emma_berlin', 'emma@example.com', '$2b$10$hash6', NULL, 0, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:05:22', '2025-06-25 12:05:22', 1, 0, NULL, NULL),
+	(24, NULL, 'james_toronto', 'james@example.com', '$2b$10$hash7', NULL, 1, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:00:22', '2025-06-25 12:00:22', 1, 0, NULL, NULL),
+	(25, NULL, 'lisa_amsterdam', 'lisa@example.com', '$2b$10$hash8', NULL, 0, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:55:22', '2025-06-25 11:55:22', 1, 0, NULL, NULL),
+	(26, NULL, 'mike_chicago', 'mike@example.com', '$2b$10$hash9', NULL, 1, 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:50:22', '2025-06-25 11:50:22', 1, 0, NULL, NULL),
+	(27, NULL, 'anna_madrid', 'anna@example.com', '$2b$10$hash10', NULL, 0, 'https://images.unsplash.com/photo-1502764613149-7f1d229e230f?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:45:22', '2025-06-25 11:45:22', 1, 0, NULL, NULL),
+	(28, NULL, 'john_vancouver', 'john@example.com', '$2b$10$hash11', NULL, 0, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:40:22', '2025-06-25 11:40:22', 1, 0, NULL, NULL),
+	(29, NULL, 'sophie_rome', 'sophie@example.com', '$2b$10$hash12', NULL, 1, 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:35:22', '2025-06-25 11:35:22', 1, 0, NULL, NULL),
+	(30, NULL, 'carlos_barcelona', 'carlos@example.com', '$2b$10$hash13', NULL, 0, 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:30:22', '2025-06-25 11:30:22', 1, 0, NULL, NULL),
+	(31, NULL, 'nina_vienna', 'nina@example.com', '$2b$10$hash14', NULL, 1, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:25:22', '2025-06-25 11:25:22', 1, 0, NULL, NULL),
+	(32, NULL, 'peter_moscow', 'peter@example.com', '$2b$10$hash15', NULL, 0, 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:20:22', '2025-06-25 11:20:22', 1, 0, NULL, NULL),
+	(33, NULL, 'chloe_zurich', 'chloe@example.com', '$2b$10$hash16', NULL, 1, 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:15:22', '2025-06-25 11:15:22', 1, 0, NULL, NULL),
+	(34, NULL, 'lucas_melbourne', 'lucas@example.com', '$2b$10$hash17', NULL, 0, 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:10:22', '2025-06-25 11:10:22', 1, 0, NULL, NULL),
+	(35, NULL, 'grace_oslo', 'grace@example.com', '$2b$10$hash18', NULL, 1, 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:05:22', '2025-06-25 11:05:22', 1, 0, NULL, NULL),
+	(36, NULL, 'ryan_dublin', 'ryan@example.com', '$2b$10$hash19', NULL, 0, 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 11:00:22', '2025-06-25 11:00:22', 1, 0, NULL, NULL),
+	(37, NULL, 'zoe_stockholm', 'zoe@example.com', '$2b$10$hash20', NULL, 1, 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 10:55:22', '2025-06-25 10:55:22', 1, 0, NULL, NULL),
+	(38, NULL, 'ben_brussels', 'ben@example.com', '$2b$10$hash21', NULL, 0, 'https://images.unsplash.com/photo-1557862921-37829c790f19?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 10:50:22', '2025-06-25 10:50:22', 1, 0, NULL, NULL),
+	(39, NULL, 'mia_copenhagen', 'mia@example.com', '$2b$10$hash22', NULL, 1, 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 10:45:22', '2025-06-25 10:45:22', 1, 0, NULL, NULL),
+	(40, NULL, 'noah_helsinki', 'noah@example.com', '$2b$10$hash23', NULL, 0, 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 10:40:22', '2025-06-25 10:40:22', 1, 0, NULL, NULL),
+	(41, NULL, 'eva_budapest', 'eva@example.com', '$2b$10$hash24', NULL, 1, 'https://images.unsplash.com/photo-1616766098956-c81f12114571?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:07:22', 1, 0, NULL, NULL),
+	(42, NULL, 'leo_prague', 'leo@example.com', '$2b$10$hash25', NULL, 0, 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:32:22', 1, 0, NULL, NULL),
+	(43, NULL, 'isla_warsaw', 'isla@example.com', '$2b$10$hash26', NULL, 1, 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:31:22', 1, 0, NULL, NULL),
+	(44, NULL, 'finn_munich', 'finn@example.com', '$2b$10$hash27', NULL, 0, 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:21:22', 1, 0, NULL, NULL),
+	(45, NULL, 'ruby_milan', 'ruby@example.com', '$2b$10$hash28', NULL, 1, 'https://images.unsplash.com/photo-1616766098956-c81f12114571?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:46:22', 1, 0, NULL, NULL),
+	(46, NULL, 'oscar_lisbon', 'oscar@example.com', '$2b$10$hash29', NULL, 0, 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:16:22', 1, 0, NULL, NULL),
+	(47, NULL, 'ivy_athens', 'ivy@example.com', '$2b$10$hash30', NULL, 1, 'https://images.unsplash.com/photo-1508186225823-0963cf9ab0de?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:56:22', 1, 0, NULL, NULL),
+	(48, NULL, 'jake_la', 'jake@example.com', '$2b$10$hash31', NULL, 0, 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:52:22', 1, 0, NULL, NULL),
+	(49, NULL, 'lily_miami', 'lily@example.com', '$2b$10$hash32', NULL, 1, 'https://images.unsplash.com/photo-1525134479668-1bee5c7c6845?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:42:22', 1, 0, NULL, NULL),
+	(50, NULL, 'ethan_denver', 'ethan@example.com', '$2b$10$hash33', NULL, 0, 'https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:32:22', 1, 0, NULL, NULL),
+	(51, NULL, 'ava_seattle', 'ava@example.com', '$2b$10$hash34', NULL, 1, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:47:22', 1, 0, NULL, NULL),
+	(52, NULL, 'owen_houston', 'owen@example.com', '$2b$10$hash35', NULL, 0, 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:02:22', 1, 0, NULL, NULL),
+	(53, NULL, 'maya_phoenix', 'maya@example.com', '$2b$10$hash36', NULL, 1, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:57:22', 1, 0, NULL, NULL),
+	(54, NULL, 'liam_boston', 'liam@example.com', '$2b$10$hash37', NULL, 0, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:27:22', 1, 0, NULL, NULL),
+	(55, NULL, 'nora_atlanta', 'nora@example.com', '$2b$10$hash38', NULL, 1, 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:37:22', 1, 0, NULL, NULL),
+	(56, NULL, 'theo_portland', 'theo@example.com', '$2b$10$hash39', NULL, 0, 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:51:22', 1, 0, NULL, NULL),
+	(57, NULL, 'zara_vegas', 'zara@example.com', '$2b$10$hash40', NULL, 1, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:41:22', 1, 0, NULL, NULL),
+	(58, NULL, 'kenji_osaka', 'kenji@example.com', '$2b$10$hash41', NULL, 0, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 12:02:22', 1, 0, NULL, NULL),
+	(59, NULL, 'yuki_seoul', 'yuki@example.com', '$2b$10$hash42', NULL, 1, 'https://images.unsplash.com/photo-1502764613149-7f1d229e230f?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:52:22', 1, 0, NULL, NULL),
+	(60, NULL, 'chen_beijing', 'chen@example.com', '$2b$10$hash43', NULL, 0, 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:42:22', 1, 0, NULL, NULL),
+	(61, NULL, 'priya_mumbai', 'priya@example.com', '$2b$10$hash44', NULL, 1, 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:32:22', 1, 0, NULL, NULL),
+	(62, NULL, 'raj_bangalore', 'raj@example.com', '$2b$10$hash45', NULL, 0, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:22:22', 1, 0, NULL, NULL),
+	(63, NULL, 'ming_shanghai', 'ming@example.com', '$2b$10$hash46', NULL, 1, 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:21:22', 1, 0, NULL, NULL),
+	(64, NULL, 'siti_jakarta', 'siti@example.com', '$2b$10$hash47', NULL, 0, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:11:22', 1, 0, NULL, NULL),
+	(65, NULL, 'kumar_delhi', 'kumar@example.com', '$2b$10$hash48', NULL, 1, 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:01:22', 1, 0, NULL, NULL),
+	(66, NULL, 'lin_taipei', 'lin@example.com', '$2b$10$hash49', NULL, 0, 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:31:22', 1, 0, NULL, NULL),
+	(67, NULL, 'aaron_singapore', 'aaron@example.com', '$2b$10$hash50', NULL, 1, 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:46:22', 1, 0, NULL, NULL),
+	(68, NULL, 'amara_cairo', 'amara@example.com', '$2b$10$hash51', NULL, 0, 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:36:22', 1, 0, NULL, NULL),
+	(69, NULL, 'omar_dubai', 'omar@example.com', '$2b$10$hash52', NULL, 1, 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:26:22', 1, 0, NULL, NULL),
+	(70, NULL, 'fatima_riyadh', 'fatima@example.com', '$2b$10$hash53', NULL, 0, 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:16:22', 1, 0, NULL, NULL),
+	(71, NULL, 'hassan_istanbul', 'hassan@example.com', '$2b$10$hash54', NULL, 1, 'https://images.unsplash.com/photo-1557862921-37829c790f19?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:31:22', 1, 0, NULL, NULL),
+	(72, NULL, 'kemi_lagos', 'kemi@example.com', '$2b$10$hash55', NULL, 0, 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:21:22', 1, 0, NULL, NULL),
+	(73, NULL, 'thandiwe_johannesburg', 'thandiwe@example.com', '$2b$10$hash56', NULL, 1, 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:41:22', 1, 0, NULL, NULL),
+	(74, NULL, 'youssef_casablanca', 'youssef@example.com', '$2b$10$hash57', NULL, 0, 'https://images.unsplash.com/photo-1616766098956-c81f12114571?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:51:22', 1, 0, NULL, NULL),
+	(75, NULL, 'aisha_nairobi', 'aisha@example.com', '$2b$10$hash58', NULL, 1, 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:11:22', 1, 0, NULL, NULL),
+	(76, NULL, 'tariq_tehran', 'tariq@example.com', '$2b$10$hash59', NULL, 0, 'https://images.unsplash.com/photo-1508186225823-0963cf9ab0de?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:01:22', 1, 0, NULL, NULL),
+	(77, NULL, 'zara_doha', 'zara2@example.com', '$2b$10$hash60', NULL, 1, 'https://images.unsplash.com/photo-1504593811423-6dd665756598?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:01:22', 1, 0, NULL, NULL),
+	(78, NULL, 'diego_mexico_city', 'diego@example.com', '$2b$10$hash61', NULL, 0, 'https://images.unsplash.com/photo-1521119989659-a83eee488004?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:42:22', 1, 0, NULL, NULL),
+	(79, NULL, 'sofia_buenos_aires', 'sofia@example.com', '$2b$10$hash62', NULL, 1, 'https://images.unsplash.com/photo-1558203728-00f45181dd84?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:32:22', 1, 0, NULL, NULL),
+	(80, NULL, 'ricardo_sao_paulo', 'ricardo@example.com', '$2b$10$hash63', NULL, 0, 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:22:22', 1, 0, NULL, NULL),
+	(81, NULL, 'valeria_lima', 'valeria@example.com', '$2b$10$hash64', NULL, 1, 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:46:22', 1, 0, NULL, NULL),
+	(82, NULL, 'carlos_bogota', 'carlos2@example.com', '$2b$10$hash65', NULL, 0, 'https://images.unsplash.com/photo-1525134479668-1bee5c7c6845?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:36:22', 1, 0, NULL, NULL),
+	(83, NULL, 'lucia_santiago', 'lucia@example.com', '$2b$10$hash66', NULL, 1, 'https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:26:22', 1, 0, NULL, NULL),
+	(84, NULL, 'pablo_caracas', 'pablo@example.com', '$2b$10$hash67', NULL, 0, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:16:22', 1, 0, NULL, NULL),
+	(85, NULL, 'isabella_quito', 'isabella@example.com', '$2b$10$hash68', NULL, 1, 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:31:22', 1, 0, NULL, NULL),
+	(86, NULL, 'mateo_montevideo', 'mateo@example.com', '$2b$10$hash69', NULL, 0, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:21:22', 1, 0, NULL, NULL),
+	(87, NULL, 'camila_la_paz', 'camila@example.com', '$2b$10$hash70', NULL, 1, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:41:22', 1, 0, NULL, NULL),
+	(88, NULL, 'brandon_dallas', 'brandon@example.com', '$2b$10$hash71', NULL, 0, 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:11:22', 1, 0, NULL, NULL),
+	(89, NULL, 'taylor_detroit', 'taylor@example.com', '$2b$10$hash72', NULL, 1, 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:01:22', 1, 0, NULL, NULL),
+	(90, NULL, 'jordan_philadelphia', 'jordan@example.com', '$2b$10$hash73', NULL, 0, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:51:22', 1, 0, NULL, NULL),
+	(91, NULL, 'riley_nashville', 'riley@example.com', '$2b$10$hash74', NULL, 1, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:41:22', 1, 0, NULL, NULL),
+	(92, NULL, 'casey_sacramento', 'casey@example.com', '$2b$10$hash75', NULL, 0, 'https://images.unsplash.com/photo-1502764613149-7f1d229e230f?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:31:22', 1, 0, NULL, NULL),
+	(93, NULL, 'jamie_salt_lake', 'jamie@example.com', '$2b$10$hash76', NULL, 1, 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:21:22', 1, 0, NULL, NULL),
+	(94, NULL, 'alex_minneapolis', 'alex2@example.com', '$2b$10$hash77', NULL, 0, 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:11:22', 1, 0, NULL, NULL),
+	(95, NULL, 'drew_kansas_city', 'drew@example.com', '$2b$10$hash78', NULL, 1, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:21:22', 1, 0, NULL, NULL),
+	(96, NULL, 'sage_richmond', 'sage@example.com', '$2b$10$hash79', NULL, 0, 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:01:22', 1, 0, NULL, NULL),
+	(97, NULL, 'river_charlotte', 'river@example.com', '$2b$10$hash80', NULL, 1, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:31:22', 1, 0, NULL, NULL),
+	(98, NULL, 'jackson_auckland', 'jackson@example.com', '$2b$10$hash81', NULL, 0, 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:22:22', 1, 0, NULL, NULL),
+	(99, NULL, 'harper_wellington', 'harper@example.com', '$2b$10$hash82', NULL, 1, 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:12:22', 1, 0, NULL, NULL),
+	(100, NULL, 'mason_brisbane', 'mason@example.com', '$2b$10$hash83', NULL, 0, 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:36:22', 1, 0, NULL, NULL),
+	(101, NULL, 'ella_perth', 'ella@example.com', '$2b$10$hash84', NULL, 1, 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:26:22', 1, 0, NULL, NULL),
+	(102, NULL, 'logan_adelaide', 'logan@example.com', '$2b$10$hash85', NULL, 0, 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:16:22', 1, 0, NULL, NULL),
+	(103, NULL, 'felix_florence', 'felix@example.com', '$2b$10$hash86', NULL, 1, 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:11:22', 1, 0, NULL, NULL),
+	(104, NULL, 'luna_venice', 'luna@example.com', '$2b$10$hash87', NULL, 0, 'https://images.unsplash.com/photo-1557862921-37829c790f19?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:01:22', 1, 0, NULL, NULL),
+	(105, NULL, 'hugo_lyon', 'hugo@example.com', '$2b$10$hash88', NULL, 1, 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:51:22', 1, 0, NULL, NULL),
+	(106, NULL, 'clara_marseille', 'clara@example.com', '$2b$10$hash89', NULL, 0, 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:41:22', 1, 0, NULL, NULL),
+	(107, NULL, 'axel_gothenburg', 'axel@example.com', '$2b$10$hash90', NULL, 1, 'https://images.unsplash.com/photo-1616766098956-c81f12114571?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:31:22', 1, 0, NULL, NULL),
+	(108, NULL, 'natalie_edinburgh', 'natalie@example.com', '$2b$10$hash91', 25, 0, 'https://images.unsplash.com/photo-1506629905607-19e1469a4ec7?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:21:22', 1, 0, NULL, NULL),
+	(109, NULL, 'sebastian_leeds', 'sebastian@example.com', '$2b$10$hash92', 31, 1, 'https://images.unsplash.com/photo-1522075469751-3847faf9d35a?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:11:22', 1, 0, NULL, NULL),
+	(110, NULL, 'aurora_reykjavik', 'aurora@example.com', '$2b$10$hash93', 28, 0, 'https://images.unsplash.com/photo-1513956589380-bad6acb9b9d4?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:45:22', 1, 0, NULL, NULL),
+	(111, NULL, 'dante_rome', 'dante@example.com', '$2b$10$hash94', 33, 1, 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:35:22', 1, 0, NULL, NULL),
+	(112, NULL, 'valentina_naples', 'valentina@example.com', '$2b$10$hash95', 26, 0, 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:25:22', 1, 0, NULL, NULL),
+	(113, NULL, 'viktor_kiev', 'viktor@example.com', '$2b$10$hash96', 29, 1, 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:15:22', 1, 0, NULL, NULL),
+	(114, NULL, 'anastasia_minsk', 'anastasia@example.com', '$2b$10$hash97', 24, 0, 'https://images.unsplash.com/photo-1544345240-3f7ed06b5c95?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:55:22', 1, 0, NULL, NULL),
+	(115, NULL, 'lars_bergen', 'lars@example.com', '$2b$10$hash98', 32, 1, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:05:22', 1, 0, NULL, NULL),
+	(116, NULL, 'ingrid_malmo', 'ingrid@example.com', '$2b$10$hash99', 27, 0, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:55:22', 1, 0, NULL, NULL),
+	(117, NULL, 'mikhail_riga', 'mikhail@example.com', '$2b$10$hash100', 30, 1, 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:45:22', 1, 0, NULL, NULL),
+	(118, NULL, 'elena_tallinn', 'elena@example.com', '$2b$10$hash101', 26, 0, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:35:22', 1, 0, NULL, NULL),
+	(119, NULL, 'magnus_trondheim', 'magnus@example.com', '$2b$10$hash102', 34, 1, 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:25:22', 1, 0, NULL, NULL),
+	(120, NULL, 'astrid_stavanger', 'astrid@example.com', '$2b$10$hash103', 23, 0, 'https://images.unsplash.com/photo-1502764613149-7f1d229e230f?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:15:22', 1, 0, NULL, NULL),
+	(121, NULL, 'erik_aalborg', 'erik@example.com', '$2b$10$hash104', 28, 1, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:05:22', 1, 0, NULL, NULL),
+	(122, NULL, 'freya_aarhus', 'freya@example.com', '$2b$10$hash105', 29, 0, 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:55:22', 1, 0, NULL, NULL),
+	(123, NULL, 'niko_tampere', 'niko@example.com', '$2b$10$hash106', 31, 1, 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:45:22', 1, 0, NULL, NULL),
+	(124, NULL, 'aino_turku', 'aino@example.com', '$2b$10$hash107', 25, 0, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:35:22', 1, 0, NULL, NULL),
+	(125, NULL, 'gustav_linkoping', 'gustav@example.com', '$2b$10$hash108', 33, 1, 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:25:22', 1, 0, NULL, NULL),
+	(126, NULL, 'saga_uppsala', 'saga@example.com', '$2b$10$hash109', 27, 0, 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:15:22', 1, 0, NULL, NULL),
+	(127, NULL, 'anton_vilnius', 'anton@example.com', '$2b$10$hash110', 30, 1, 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:05:22', 1, 0, NULL, NULL),
+	(128, NULL, 'ruta_kaunas', 'ruta@example.com', '$2b$10$hash111', 26, 0, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:55:22', 1, 0, NULL, NULL),
+	(129, NULL, 'matteo_bologna', 'matteo@example.com', '$2b$10$hash112', 28, 1, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:45:22', 1, 0, NULL, NULL),
+	(130, NULL, 'giulia_turin', 'giulia@example.com', '$2b$10$hash113', 24, 0, 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:35:22', 1, 0, NULL, NULL),
+	(131, NULL, 'alessandro_genoa', 'alessandro@example.com', '$2b$10$hash114', 32, 1, 'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:25:22', 1, 0, NULL, NULL),
+	(132, NULL, 'francesca_palermo', 'francesca@example.com', '$2b$10$hash115', 29, 0, 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:15:22', 1, 0, NULL, NULL),
+	(133, NULL, 'hans_salzburg', 'hans@example.com', '$2b$10$hash116', 35, 1, 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 11:05:22', 1, 0, NULL, NULL),
+	(134, NULL, 'liesel_graz', 'liesel@example.com', '$2b$10$hash117', 27, 0, 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:55:22', 1, 0, NULL, NULL),
+	(135, NULL, 'wolfgang_innsbruck', 'wolfgang@example.com', '$2b$10$hash118', 31, 1, 'https://images.unsplash.com/photo-1557862921-37829c790f19?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:45:22', 1, 0, NULL, NULL),
+	(136, NULL, 'brigitte_linz', 'brigitte@example.com', '$2b$10$hash119', 28, 0, 'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:35:22', 1, 0, NULL, NULL),
+	(137, NULL, 'jean_lyon', 'jean@example.com', '$2b$10$hash120', 33, 1, 'https://images.unsplash.com/photo-1503443207922-dff7d543fd0e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:25:22', 1, 0, NULL, NULL),
+	(138, NULL, 'marie_toulouse', 'marie@example.com', '$2b$10$hash121', 26, 0, 'https://images.unsplash.com/photo-1616766098956-c81f12114571?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:15:22', 1, 0, NULL, NULL),
+	(139, NULL, 'pierre_bordeaux', 'pierre@example.com', '$2b$10$hash122', 30, 1, 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 10:05:22', 1, 0, NULL, NULL),
+	(140, NULL, 'camille_nantes', 'camille@example.com', '$2b$10$hash123', 25, 0, 'https://images.unsplash.com/photo-1508186225823-0963cf9ab0de?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:55:22', 1, 0, NULL, NULL),
+	(141, NULL, 'henri_strasbourg', 'henri@example.com', '$2b$10$hash124', 34, 1, 'https://images.unsplash.com/photo-1504593811423-6dd665756598?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:45:22', 1, 0, NULL, NULL),
+	(142, NULL, 'claire_nice', 'claire@example.com', '$2b$10$hash125', 27, 0, 'https://images.unsplash.com/photo-1521119989659-a83eee488004?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:35:22', 1, 0, NULL, NULL),
+	(143, NULL, 'diego_valencia', 'diego2@example.com', '$2b$10$hash126', 29, 1, 'https://images.unsplash.com/photo-1558203728-00f45181dd84?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:25:22', 1, 0, NULL, NULL),
+	(144, NULL, 'carmen_seville', 'carmen@example.com', '$2b$10$hash127', 31, 0, 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:15:22', 1, 0, NULL, NULL),
+	(145, NULL, 'javier_bilbao', 'javier@example.com', '$2b$10$hash128', 28, 1, 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 09:05:22', 1, 0, NULL, NULL),
+	(146, NULL, 'lucia_zaragoza', 'lucia2@example.com', '$2b$10$hash129', 26, 0, 'https://images.unsplash.com/photo-1525134479668-1bee5c7c6845?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:55:22', 1, 0, NULL, NULL),
+	(147, NULL, 'pablo_murcia', 'pablo2@example.com', '$2b$10$hash130', 32, 1, 'https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:45:22', 1, 0, NULL, NULL),
+	(148, NULL, 'ines_cordoba', 'ines@example.com', '$2b$10$hash131', 24, 0, 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:35:22', 1, 0, NULL, NULL),
+	(149, NULL, 'hugo_braga', 'hugo2@example.com', '$2b$10$hash132', 30, 1, 'https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:25:22', 1, 0, NULL, NULL),
+	(150, NULL, 'ana_braga', 'ana@example.com', '$2b$10$hash133', 27, 0, 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:15:22', 1, 0, NULL, NULL),
+	(151, NULL, 'carlos_coimbra', 'carlos3@example.com', '$2b$10$hash134', 29, 1, 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 08:05:22', 1, 0, NULL, NULL),
+	(152, NULL, 'beatriz_funchal', 'beatriz@example.com', '$2b$10$hash135', 25, 0, 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:55:22', 1, 0, NULL, NULL),
+	(153, NULL, 'rodrigo_aveiro', 'rodrigo@example.com', '$2b$10$hash136', 33, 1, 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:45:22', 1, 0, NULL, NULL),
+	(154, NULL, 'marta_faro', 'marta@example.com', '$2b$10$hash137', 28, 0, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:35:22', 1, 0, NULL, NULL),
+	(155, NULL, 'ivan_split', 'ivan@example.com', '$2b$10$hash138', 31, 1, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:25:22', 1, 0, NULL, NULL),
+	(156, NULL, 'ana_zagreb', 'ana2@example.com', '$2b$10$hash139', 26, 0, 'https://images.unsplash.com/photo-1502764613149-7f1d229e230f?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:15:22', 1, 0, NULL, NULL),
+	(157, NULL, 'marko_rijeka', 'marko@example.com', '$2b$10$hash140', 34, 1, 'https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?w=100', 'Unknown', '2025-06-24 11:56:40', '2025-06-25 12:22:22', '2025-06-25 07:05:22', 1, 0, NULL, NULL);
 
 -- Dumping structure for table abandoned_explorer.user_locations
 CREATE TABLE IF NOT EXISTS `user_locations` (
@@ -936,12 +1027,12 @@ CREATE TABLE IF NOT EXISTS `user_locations` (
   KEY `idx_coordinates` (`latitude`,`longitude`),
   KEY `idx_updated_at` (`updated_at`),
   CONSTRAINT `user_locations_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=563 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=719 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dumping data for table abandoned_explorer.user_locations: ~94 rows (approximately)
+-- Dumping data for table abandoned_explorer.user_locations: ~91 rows (approximately)
 INSERT INTO `user_locations` (`id`, `user_id`, `latitude`, `longitude`, `accuracy_meters`, `location_name`, `updated_at`, `created_at`) VALUES
-	(1, 2, 37.78583400, -122.40641700, 1000, NULL, '2025-07-01 05:31:47', '2025-06-24 10:16:44'),
-	(2, 1, 42.34310377, 27.18901279, 1000, NULL, '2025-06-30 23:01:34', '2025-06-24 10:16:44'),
+	(1, 2, 37.78583400, -122.40641700, 1000, NULL, '2025-07-06 17:31:57', '2025-06-24 10:16:44'),
+	(2, 1, 42.34310106, 27.18914527, 1000, NULL, '2025-07-06 18:10:43', '2025-06-24 10:16:44'),
 	(32, 18, 40.71280000, -74.00600000, 50, 'New York, NY, USA', '2025-06-24 12:20:22', '2025-06-24 12:22:22'),
 	(33, 19, 51.50740000, -0.12780000, 30, 'London, UK', '2025-06-24 12:21:22', '2025-06-24 12:22:22'),
 	(34, 20, 48.85660000, 2.35220000, 40, 'Paris, France', '2025-06-24 12:19:22', '2025-06-24 12:22:22'),
@@ -1071,82 +1162,6 @@ CREATE TABLE IF NOT EXISTS `user_sessions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Dumping data for table abandoned_explorer.user_sessions: ~0 rows (approximately)
-
--- Dumping structure for table abandoned_explorer.group_message_likes
-CREATE TABLE IF NOT EXISTS `group_message_likes` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `uuid` char(36) DEFAULT NULL,
-  `message_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `unique_message_like` (`message_id`,`user_id`),
-  UNIQUE KEY `uuid` (`uuid`),
-  KEY `idx_uuid` (`uuid`),
-  KEY `idx_message_likes` (`message_id`),
-  KEY `idx_user_likes` (`user_id`),
-  CONSTRAINT `group_message_likes_ibfk_1` FOREIGN KEY (`message_id`) REFERENCES `group_messages` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `group_message_likes_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Dumping data for table abandoned_explorer.group_message_likes: ~0 rows (approximately)
-
--- Dumping structure for table abandoned_explorer.group_bans
-CREATE TABLE IF NOT EXISTS `group_bans` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `uuid` char(36) DEFAULT NULL,
-  `group_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `banned_by` int(11) NOT NULL,
-  `ban_reason` text DEFAULT NULL,
-  `ban_type` enum('kick','ban') DEFAULT 'ban',
-  `is_permanent` tinyint(1) DEFAULT 1,
-  `expires_at` timestamp NULL DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `unbanned_at` timestamp NULL DEFAULT NULL,
-  `unbanned_by` int(11) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `unique_active_ban` (`group_id`,`user_id`,`unbanned_at`),
-  UNIQUE KEY `uuid` (`uuid`),
-  KEY `idx_uuid` (`uuid`),
-  KEY `idx_group_bans` (`group_id`,`created_at`),
-  KEY `idx_user_bans` (`user_id`,`created_at`),
-  KEY `idx_banned_by` (`banned_by`),
-  KEY `idx_unbanned_by` (`unbanned_by`),
-  KEY `idx_ban_type` (`ban_type`),
-  KEY `idx_active_bans` (`group_id`,`unbanned_at`),
-  CONSTRAINT `group_bans_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `group_bans_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `group_bans_ibfk_3` FOREIGN KEY (`banned_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `group_bans_ibfk_4` FOREIGN KEY (`unbanned_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Dumping data for table abandoned_explorer.group_bans: ~0 rows (approximately)
-
--- Dumping structure for table abandoned_explorer.group_admin_actions
-CREATE TABLE IF NOT EXISTS `group_admin_actions` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `uuid` char(36) DEFAULT NULL,
-  `group_id` int(11) NOT NULL,
-  `admin_id` int(11) NOT NULL,
-  `target_user_id` int(11) DEFAULT NULL,
-  `action_type` enum('kick','ban','unban','delete_message','promote','demote','delete_group') NOT NULL,
-  `reason` text DEFAULT NULL,
-  `metadata` json DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uuid` (`uuid`),
-  KEY `idx_uuid` (`uuid`),
-  KEY `idx_group_actions` (`group_id`,`created_at`),
-  KEY `idx_admin_actions` (`admin_id`,`created_at`),
-  KEY `idx_target_user` (`target_user_id`),
-  KEY `idx_action_type` (`action_type`),
-  CONSTRAINT `group_admin_actions_ibfk_1` FOREIGN KEY (`group_id`) REFERENCES `groups` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `group_admin_actions_ibfk_2` FOREIGN KEY (`admin_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `group_admin_actions_ibfk_3` FOREIGN KEY (`target_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Dumping data for table abandoned_explorer.group_admin_actions: ~0 rows (approximately)
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
