@@ -25,6 +25,16 @@ struct MapView: View {
     @State private var showingNotifications = false
     @State private var showingCreateGroup = false
     @State private var showingJoinGroup = false
+    
+    // Radar visibility state - synchronized with SmartBottomPanel
+    @State private var isRadarVisible = false
+    private let radarExpandedZoomThreshold: Double = 14.0
+    private let radarHiddenZoomThreshold: Double = 13.0
+    
+    // Computed property for radar visibility (matches SmartBottomPanel logic)
+    private var shouldShowRadar: Bool {
+        isRadarVisible
+    }
 
     @State private var currentZoomLevel: Double = 14.0
     @State private var currentMapCenter: CLLocationCoordinate2D?
@@ -150,6 +160,8 @@ struct MapView: View {
     @State private var showRadarCount = false
     @State private var showCenterButton = true
     
+
+    
     var body: some View {
         ZStack {
             // Background
@@ -159,17 +171,14 @@ struct MapView: View {
             contentView
                 .ignoresSafeArea()
             
-            // Radar effect is now integrated into the user location marker
-            
-            // Add after the content but before the header overlay
-            if showRadarCount {
-                RadarCountView(
-                    userCount: dataManager.activeUsersCount,
-                    locationCount: dataManager.getApprovedLocations().count,
-                    isVisible: $showRadarCount,
-                    userLocation: locationManager.userLocation
-                )
-                .zIndex(2)
+            // Radar effect overlay - positioned at actual user location marker
+            // Uses exact same zoom logic as SmartBottomPanel for synchronized visibility
+            if let userLocation = locationManager.userLocation {
+                RadarPositionTracker(userLocation: userLocation)
+                    .allowsHitTesting(false)
+                    .opacity(shouldShowRadar ? 1.0 : 0.0)
+                    .scaleEffect(shouldShowRadar ? 1.0 : 0.8)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.1), value: shouldShowRadar)
             }
             
             // Add center button in bottom right corner
@@ -370,6 +379,18 @@ struct MapView: View {
             JoinGroupView()
                 .environmentObject(dataManager)
         }
+        .onChange(of: currentZoomLevel) { newZoomLevel in
+            // Update radar visibility with same hysteresis logic as SmartBottomPanel
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.1)) {
+                if newZoomLevel >= radarExpandedZoomThreshold && !isRadarVisible {
+                    // Show radar when zooming in to street level
+                    isRadarVisible = true
+                } else if newZoomLevel <= radarHiddenZoomThreshold && isRadarVisible {
+                    // Hide radar when zooming out to state/country level
+                    isRadarVisible = false
+                }
+            }
+        }
         .onAppear {
             print("🗺️ MapView appeared")
             print("🔍 Initial location manager status: \(locationManager.authorizationStatus.rawValue)")
@@ -379,6 +400,13 @@ struct MapView: View {
             
             // Update DataManager with current zoom level
             dataManager.updateZoomLevel(currentZoomLevel)
+            
+            // Set initial radar visibility based on current zoom level
+            withAnimation(.easeOut(duration: 0.4)) {
+                isRadarVisible = currentZoomLevel >= radarExpandedZoomThreshold
+            }
+            
+
             
             if let userLoc = locationManager.userLocation {
                 print("📍 Initial user location: \(userLoc.latitude), \(userLoc.longitude)")
@@ -420,11 +448,6 @@ struct MapView: View {
                     print("🌍 Received continental zoom notification - loading global locations (zoom: \(String(format: "%.1f", zoomLevel)))")
                     loadGlobalLocationsBypassingThrottling()
                 }
-            }
-            
-            // Add to existing onAppear
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                showRadarCount = true
             }
         }
         .onChange(of: locationManager.userLocation) {
@@ -501,6 +524,8 @@ struct MapView: View {
         lastLocationUpdate = now
         updateLocationAndLoad()
     }
+    
+
     
     private func loadInitialData() {
         // Force immediate loading for current map view
@@ -940,6 +965,8 @@ struct MapboxMapView: UIViewRepresentable {
     let onZoomChange: (Double) -> Void
     let onMapCenterChange: ((CLLocationCoordinate2D) -> Void)?
     
+
+    
     func makeUIView(context: Context) -> MapboxMaps.MapView {
         let mapView = MapboxMaps.MapView(frame: .zero)
         mapView.backgroundColor = UIColor.black
@@ -1024,6 +1051,13 @@ struct MapboxMapView: UIViewRepresentable {
         let currentZoom = uiView.mapboxMap.cameraState.zoom
         context.coordinator.updateAnnotations(locations: locations, userLocation: userLocation, zoomLevel: currentZoom)
         context.coordinator.updateActiveUserMarkers(activeUsers: activeUsers, zoomLevel: currentZoom)
+        
+        // Update user location screen position for radar tracking
+        if let userLocation = userLocation {
+            context.coordinator.updateUserLocationScreenPosition(userLocation)
+        }
+        
+
     }
     
     func makeCoordinator() -> Coordinator {
@@ -1052,6 +1086,11 @@ struct MapboxMapView: UIViewRepresentable {
         // Continental zoom tracking
         private var lastContinentalZoom: Double = 0
         private var lastContinentalLoadTime: TimeInterval = 0
+        
+        // User location screen position for radar tracking
+        var userLocationScreenPosition: CGPoint = CGPoint.zero
+        
+
         
         init(_ parent: MapboxMapView) {
             self.parent = parent
@@ -1338,6 +1377,17 @@ struct MapboxMapView: UIViewRepresentable {
             print("📍 Total annotations added: \(annotationManager.annotations.count) (processed from \(pendingLocations.count) original locations)")
         }
         
+        func getScreenPoint(for coordinate: CLLocationCoordinate2D) -> CGPoint? {
+            guard let mapView = mapView else { return nil }
+            return mapView.mapboxMap.point(for: coordinate)
+        }
+        
+        func updateUserLocationScreenPosition(_ coordinate: CLLocationCoordinate2D) {
+            if let screenPoint = getScreenPoint(for: coordinate) {
+                userLocationScreenPosition = screenPoint
+            }
+        }
+        
         // Apply crowd effect - cluster nearby markers when zoomed out
         private func applyCrowdEffect(locations: [AbandonedLocation], zoomLevel: Double) -> [AbandonedLocation] {
             // At high zoom levels (close up), show all markers
@@ -1427,8 +1477,8 @@ struct MapboxMapView: UIViewRepresentable {
                 let center = CGPoint(x: rect.midX, y: rect.midY)
                 let radius = min(rect.width, rect.height) / 2 - 2
                 
-                // Draw outer golden ring (like Citizen)
-                let ringColor = UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0) // Golden yellow
+                // Draw outer blue ring (theme color)
+                let ringColor = UIColor(red: 0.447, green: 0.537, blue: 0.855, alpha: 1.0) // Blue theme color #7289da
                 cgContext.setFillColor(ringColor.cgColor)
                 cgContext.setShadow(offset: CGSize(width: 0, height: 2), blur: 6, color: ringColor.withAlphaComponent(0.6).cgColor)
                 cgContext.fillEllipse(in: rect)
@@ -1468,12 +1518,12 @@ struct MapboxMapView: UIViewRepresentable {
                 cgContext.setShadow(offset: CGSize(width: 0, height: 1), blur: 2, 
                                   color: UIColor.black.withAlphaComponent(shadowAlpha).cgColor)
                 
-                // GOLDEN RING - scales with zoom for bubble effect
+                // BLUE RING - scales with zoom for bubble effect
                 let ringRadius: CGFloat = 18 // Smaller ring for better scaling
                 let strokeWidth: CGFloat = 2.0 // Thinner stroke
                 
-                // Golden ring (Citizen-style)
-                cgContext.setStrokeColor(UIColor(red: 1.0, green: 0.84, blue: 0.0, alpha: 1.0).cgColor)
+                // Blue ring (theme color)
+                cgContext.setStrokeColor(UIColor(red: 0.447, green: 0.537, blue: 0.855, alpha: 1.0).cgColor)
                 cgContext.setLineWidth(strokeWidth)
                 let strokeRect = CGRect(x: center.x - ringRadius, y: center.y - ringRadius, 
                                       width: ringRadius * 2, height: ringRadius * 2)
@@ -1521,30 +1571,29 @@ struct MapboxMapView: UIViewRepresentable {
         }
         
         private func createUserLocationMarker() -> UIImage {
-            let size = CGSize(width: 24, height: 24) // Smaller base size for better scaling
+            let size = CGSize(width: 32, height: 32) // Standard size for user location
             let renderer = UIGraphicsImageRenderer(size: size)
             
             return renderer.image { context in
                 let cgContext = context.cgContext
                 let rect = CGRect(origin: .zero, size: size)
-                
                 // Create pulsing effect background (larger circle) - more subtle
                 let pulseRect = rect
                 cgContext.setFillColor(UIColor.systemBlue.withAlphaComponent(0.15).cgColor)
                 cgContext.fillEllipse(in: pulseRect)
                 
                 // Create main blue dot
-                let dotRect = rect.insetBy(dx: 4, dy: 4)
+                let dotRect = rect.insetBy(dx: 6, dy: 6)
                 cgContext.setFillColor(UIColor.systemBlue.cgColor)
                 cgContext.fillEllipse(in: dotRect)
                 
                 // Add white border around blue dot (thinner)
                 cgContext.setStrokeColor(UIColor.white.cgColor)
-                cgContext.setLineWidth(2)
+                cgContext.setLineWidth(3)
                 cgContext.strokeEllipse(in: dotRect)
                 
                 // Add smaller inner white circle for definition
-                let innerDotRect = dotRect.insetBy(dx: 2, dy: 2)
+                let innerDotRect = dotRect.insetBy(dx: 3, dy: 3)
                 cgContext.setFillColor(UIColor.white.cgColor)
                 cgContext.fillEllipse(in: innerDotRect)
             }
@@ -2294,5 +2343,142 @@ struct RadarScanLineView: View {
             )
         }
         .rotationEffect(.degrees(-90))  // Start from top instead of right
+    }
+}
+
+// MARK: - Radar Position Tracker
+struct RadarPositionTracker: View {
+    let userLocation: CLLocationCoordinate2D
+    
+    var body: some View {
+        // For now, position the radar at the center of the screen
+        // This works because the map typically keeps the user location centered
+        GeometryReader { geometry in
+            AnimatedRadarOverlay(userLocation: userLocation)
+                .position(
+                    x: geometry.size.width / 2,
+                    y: geometry.size.height / 2
+                )
+        }
+    }
+}
+
+// MARK: - Enhanced Radar Overlay
+struct AnimatedRadarOverlay: View {
+    let userLocation: CLLocationCoordinate2D
+    
+    @State private var radarAngle: Double = 0
+    @State private var pulseScale: CGFloat = 1.0
+    
+    // Timer for smooth animation
+    let timer = Timer.publish(every: 0.016, on: .main, in: .common).autoconnect() // 60 FPS
+    
+    // Blue radar color scheme
+    private let gridColor = Color(hex: "7289da").opacity(0.6)
+    private let scanColor = Color(hex: "7289da")
+    private let trailColor = Color(hex: "7289da")
+    
+    var body: some View {
+        ZStack {
+            // Radar grid - concentric circles
+            ZStack {
+                // Multiple concentric circles
+                ForEach(1...4, id: \.self) { index in
+                    Circle()
+                        .stroke(gridColor, lineWidth: 1.0)
+                        .frame(width: CGFloat(30 * index), height: CGFloat(30 * index))
+                }
+                
+                // Cross lines - dividing into 4 quarters
+                Path { path in
+                    // Horizontal line
+                    path.move(to: CGPoint(x: -60, y: 0))
+                    path.addLine(to: CGPoint(x: 60, y: 0))
+                    // Vertical line
+                    path.move(to: CGPoint(x: 0, y: -60))
+                    path.addLine(to: CGPoint(x: 0, y: 60))
+                }
+                .stroke(gridColor, lineWidth: 1.0)
+            }
+            
+            // Radar sweep effect
+            ZStack {
+                // Trailing fade effect - creates the classic radar sweep look
+                Circle()
+                    .fill(
+                        AngularGradient(
+                            gradient: Gradient(stops: [
+                                .init(color: trailColor.opacity(0.8), location: 0.0),
+                                .init(color: trailColor.opacity(0.6), location: 0.15),
+                                .init(color: trailColor.opacity(0.4), location: 0.3),
+                                .init(color: trailColor.opacity(0.2), location: 0.5),
+                                .init(color: trailColor.opacity(0.1), location: 0.7),
+                                .init(color: Color.clear, location: 0.85),
+                                .init(color: Color.clear, location: 1.0)
+                            ]),
+                            center: .center,
+                            startAngle: .degrees(-90),
+                            endAngle: .degrees(270)
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+                    .mask(
+                        Circle()
+                            .stroke(lineWidth: 120)
+                            .frame(width: 120, height: 120)
+                    )
+                    .rotationEffect(.degrees(radarAngle))
+                
+                // Bright sweep line - the leading edge of the radar beam
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.clear,
+                                scanColor.opacity(0.5),
+                                scanColor,
+                                scanColor,
+                                scanColor.opacity(0.5),
+                                Color.clear
+                            ]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: 3, height: 60)
+                    .offset(y: -30)
+                    .shadow(color: scanColor, radius: 3, x: 0, y: 0)
+                    .rotationEffect(.degrees(radarAngle))
+            }
+            
+            // Center dot (user location) with subtle pulse
+            Circle()
+                .fill(scanColor)
+                .frame(width: 6, height: 6)
+                .scaleEffect(pulseScale)
+                .shadow(color: scanColor.opacity(0.8), radius: 2, x: 0, y: 0)
+        }
+        .onAppear {
+            startRadarAnimation()
+        }
+        .onReceive(timer) { _ in
+            // Smooth rotation animation
+            radarAngle += 1.5 // Adjust speed as needed
+            if radarAngle >= 360 {
+                radarAngle = 0
+            }
+        }
+    }
+    
+    private func startRadarAnimation() {
+        // Reset angle first
+        radarAngle = 0
+        
+        print("🎯 Radar animation started")
+        
+        // Subtle center dot pulse
+        withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+            pulseScale = 1.3
+        }
     }
 }

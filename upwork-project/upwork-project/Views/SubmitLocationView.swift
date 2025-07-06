@@ -1472,7 +1472,7 @@ struct LocationSelectionMapView: UIViewRepresentable {
         }
         
         private func createUserLocationMarker() -> UIImage {
-            let size = CGSize(width: 20, height: 20)
+            let size = CGSize(width: 28, height: 28)
             let renderer = UIGraphicsImageRenderer(size: size)
             
             return renderer.image { context in
@@ -1485,7 +1485,7 @@ struct LocationSelectionMapView: UIViewRepresentable {
                 
                 // White border
                 cgContext.setStrokeColor(UIColor.white.cgColor)
-                cgContext.setLineWidth(2)
+                cgContext.setLineWidth(3)
                 cgContext.strokeEllipse(in: rect)
             }
         }

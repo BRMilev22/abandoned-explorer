@@ -47,22 +47,16 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4599DB9E2E08668900578100 /* upwork-project */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "upwork-project";
 			sourceTree = "<group>";
 		};
 		4599DBAC2E08668A00578100 /* upwork-projectTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "upwork-projectTests";
 			sourceTree = "<group>";
 		};
 		4599DBB62E08668A00578100 /* upwork-projectUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "upwork-projectUITests";
 			sourceTree = "<group>";
 		};
@@ -340,9 +334,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-upwork-project-upwork-projectUITests/Pods-upwork-project-upwork-projectUITests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -357,9 +355,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-upwork-project/Pods-upwork-project-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-upwork-project/Pods-upwork-project-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
