@@ -88,6 +88,10 @@ class DataManager: ObservableObject {
     
     // Regional cache storage
     private var cachedRegions: [String: CachedRegion] = [:]
+    
+    // Location details cache
+    private var cachedLocationDetails: [Int: (details: LocationDetails, timestamp: Date)] = [:]
+    private let locationDetailsCacheTimeout: TimeInterval = 300 // 5 minutes
     private var lastLocationRequest = Date()
     private let locationRequestThreshold: TimeInterval = 5.0 // Increased to 5 seconds minimum
     private var isLoadingLocations = false
@@ -121,6 +125,26 @@ class DataManager: ObservableObject {
         
         // Load dynamic data
         loadDynamicData()
+    }
+    
+    // MARK: - Location Details Caching
+    func getCachedLocationDetails(locationId: Int) -> LocationDetails? {
+        if let cached = cachedLocationDetails[locationId] {
+            let now = Date()
+            if now.timeIntervalSince(cached.timestamp) < locationDetailsCacheTimeout {
+                print("📋 Using cached location details for ID: \(locationId)")
+                return cached.details
+            } else {
+                print("🗑️ Cache expired for location ID: \(locationId)")
+                cachedLocationDetails.removeValue(forKey: locationId)
+            }
+        }
+        return nil
+    }
+    
+    func cacheLocationDetails(_ details: LocationDetails) {
+        cachedLocationDetails[details.id] = (details, Date())
+        print("💾 Cached location details for ID: \(details.id)")
     }
     
     private func setupBindings() {
@@ -292,7 +316,8 @@ class DataManager: ObservableObject {
         let imageUrls = locations.flatMap { $0.displayImages }
         if !imageUrls.isEmpty {
             print("DataManager: Preloading \(imageUrls.count) images...")
-            ImageCache.shared.preloadImages(urls: imageUrls)
+            // Use high-priority preloading for feed items
+            ImageCache.shared.preloadFeedImages(urls: imageUrls, highPriority: true)
         }
     }
     
@@ -791,6 +816,11 @@ class DataManager: ObservableObject {
                 }
             )
             .store(in: &cancellables)
+    }
+    
+    func hasUserLikedLocation(locationId: Int) -> Bool {
+        // Check if the user has liked this location
+        return locations.first(where: { $0.id == locationId })?.isLiked ?? false
     }
     
     func loadUserBookmarks() {
@@ -2347,4 +2377,67 @@ class DataManager: ObservableObject {
         }
     }
 
+    // MARK: - Real-time Statistics for Notifications
+    @Published var nearbyActiveUsersCount: Int = 0
+    @Published var nearbyLocationsCount: Int = 0
+    @Published var isLoadingNearbyStats = false
+    @Published var lastStatsLocation: CLLocationCoordinate2D?
+    @Published var lastStatsRadius: Double = 50.0
+    
+    // MARK: - Real-time Statistics for Notifications
+    
+    func loadNearbyStatistics(latitude: Double, longitude: Double, radius: Double = 50.0) {
+        // Avoid duplicate requests
+        guard !isLoadingNearbyStats else {
+            print("⏸️ Already loading nearby stats, skipping request")
+            return
+        }
+        
+        // Store current request parameters
+        lastStatsLocation = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        lastStatsRadius = radius
+        isLoadingNearbyStats = true
+        
+        print("📊 Loading nearby statistics for: \(latitude), \(longitude) within \(radius)km")
+        
+        // Load both active users stats and nearby locations count in parallel
+        let activeUsersStatsPublisher = apiService.getActiveUsersStats(latitude: latitude, longitude: longitude, radius: radius)
+        let nearbyLocationsPublisher = apiService.getNearbyLocations(latitude: latitude, longitude: longitude, radius: Int(radius)) // Convert to Int as API expects
+        
+        Publishers.Zip(activeUsersStatsPublisher, nearbyLocationsPublisher)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    self?.isLoadingNearbyStats = false
+                    if case .failure(let error) = completion {
+                        print("❌ Failed to load nearby statistics: \(error)")
+                    }
+                },
+                receiveValue: { [weak self] (statsResponse, locationsResponse) in
+                    print("📊 Nearby statistics loaded:")
+                    print("   👥 Active users: \(statsResponse.statistics.totalUsers)")
+                    print("   📍 Nearby locations: \(locationsResponse.locations.count)")
+                    
+                    // Exclude current user from active users count (API includes current user)
+                    let otherUsersCount = max(0, statsResponse.statistics.totalUsers - 1)
+                    
+                    self?.nearbyActiveUsersCount = otherUsersCount
+                    self?.nearbyLocationsCount = locationsResponse.locations.count
+                    self?.isLoadingNearbyStats = false
+                    
+                    print("   👥 Other users nearby: \(otherUsersCount) (excluding current user)")
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    func refreshNearbyStatistics() {
+        guard let location = lastStatsLocation else {
+            print("⚠️ No previous stats location available for refresh")
+            return
+        }
+        
+        print("🔄 Refreshing nearby statistics...")
+        loadNearbyStatistics(latitude: location.latitude, longitude: location.longitude, radius: lastStatsRadius)
+    }
 }

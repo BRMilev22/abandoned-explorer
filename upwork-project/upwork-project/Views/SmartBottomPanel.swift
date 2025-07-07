@@ -7,6 +7,7 @@ struct SmartBottomPanel: View {
     let onGroupsPressed: () -> Void
     let onCreateGroupPressed: () -> Void
     let onJoinGroupPressed: (String) -> Void
+    let hideNotifications: Bool // New parameter to hide notifications in feed view
     
     @State private var isExpanded = true
     @State private var dragOffset: CGFloat = 0
@@ -14,6 +15,13 @@ struct SmartBottomPanel: View {
     @State private var isCreateButtonPulsating = false
     @State private var chasingAnimationOffset: CGFloat = 0
     @State private var pulseScale: CGFloat = 1.0
+    @State private var chasingRotation: Double = 0
+    @State private var buttonPulseScale: CGFloat = 1.0
+    
+    // Notification cycling state
+    @State private var showingNotification = false
+    @State private var currentNotificationType = 0 // 0 = users, 1 = locations
+    @State private var notificationTimer: Timer?
     
     // Number of characters expected in the invite code
     private let codeLength: Int = 6
@@ -42,6 +50,15 @@ struct SmartBottomPanel: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // Notification appears above the panel (expanded or minimized)
+            // Only show notifications when not in feed view
+            if showingNotification && !hideNotifications {
+                notificationView
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .allowsHitTesting(false) // Don't interfere with panel interactions
+                    .padding(.bottom, 16) // Space between notification and panel
+            }
+            
             // Pull indicator when collapsed
             if !isExpanded {
                 Button(action: {
@@ -52,23 +69,23 @@ struct SmartBottomPanel: View {
                     VStack(spacing: 4) {
                         // Pull up indicator
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.white.opacity(0.4))
+                            .fill(Color.white.opacity(0.3))
                             .frame(width: 40, height: 4)
-                            .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                            .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
                         
                         // Chevron up icon
                         Image(systemName: "chevron.up")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(.white.opacity(0.6))
                     }
                     .padding(.vertical, 8)
                     .frame(maxWidth: .infinity)
                     .background(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.black.opacity(0.9))
+                            .fill(Color.black.opacity(0.3))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
                             )
                     )
                     .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
@@ -107,27 +124,102 @@ struct SmartBottomPanel: View {
         )
         .onChange(of: currentZoomLevel) { newZoomLevel in
             withAnimation(.spring(response: 0.5, dampingFraction: 0.85, blendDuration: 0.1)) {
-                if newZoomLevel >= expandedZoomThreshold && !isExpanded {
-                    // Show panel when zooming in to street level
-                    isExpanded = true
-                } else if newZoomLevel <= hiddenZoomThreshold && isExpanded {
-                    // Hide panel when zooming out to state/country level
-                    isExpanded = false
+                // Panel expansion logic
+                if newZoomLevel >= hiddenZoomThreshold {
+                    if !isExpanded {
+                        isExpanded = true
+                    }
+                } else {
+                    if isExpanded {
+                        isExpanded = false
+                    }
+                }
+                
+                // Notification logic - independent of panel state
+                // Show notifications for reasonable zoom levels (>= 10.0) and not in feed view
+                if newZoomLevel >= 10.0 && !hideNotifications {
+                    if !showingNotification {
+                        startNotificationCycle()
+                    }
+                } else {
+                    // Stop notifications at low zoom levels or when in feed view
+                    stopNotificationCycle()
                 }
             }
         }
         .onAppear {
-            // Set initial state based on zoom level
-            withAnimation(.easeOut(duration: 0.4)) {
-                isExpanded = shouldExpand
+            // Set initial panel state
+            if currentZoomLevel >= hiddenZoomThreshold {
+                isExpanded = true
+            }
+            
+            // Start notifications for reasonable zoom levels and not in feed view
+            if currentZoomLevel >= 10.0 && !hideNotifications {
+                startNotificationCycle()
             }
         }
+        .onDisappear {
+            stopNotificationCycle()
+        }
+    }
+    
+    // MARK: - Notification View
+    @ViewBuilder
+    private var notificationView: some View {
+        HStack(spacing: 12) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(currentNotificationType == 0 ? Color.green.opacity(0.2) : Color(hex: "7289da").opacity(0.2))
+                    .frame(width: 40, height: 40)
+                
+                Image(systemName: currentNotificationType == 0 ? "person.2.fill" : "location.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(currentNotificationType == 0 ? Color.green : Color(hex: "7289da"))
+            }
+            
+            // Text content using real nearby statistics
+            VStack(alignment: .leading, spacing: 2) {
+                if currentNotificationType == 0 {
+                    Text("\(dataManager.nearbyActiveUsersCount) other users")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Text("near you")
+                        .font(.system(size: 13))
+                        .foregroundColor(.gray)
+                } else {
+                    Text("\(dataManager.nearbyLocationsCount) locations")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Text("around you")
+                        .font(.system(size: 13))
+                        .foregroundColor(.gray)
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.black.opacity(0.3))
+                .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: Color.black.opacity(0.15), radius: 15, x: 0, y: 8)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+        )
+        .padding(.horizontal, 20)
     }
     
     // MARK: - Group Options Content (when user has no groups)
     @ViewBuilder
     private var groupOptionsContent: some View {
-        let panelHeight = UIScreen.main.bounds.height / 3
+        let panelHeight = UIScreen.main.bounds.height / 2.5 // Increased from /3 to provide more space for info popups
         
         VStack(spacing: 0) {
             // Top section with title and subtitle
@@ -215,144 +307,172 @@ struct SmartBottomPanel: View {
             .padding(.bottom, 20)
             
             // Create Group button with enhanced styling and animations
-            ZStack {
-                // Static outline with chasing glow effect
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color(hex: "7289da").opacity(0.4), lineWidth: 2)
-                
-                // Chasing glow effect that moves around
+            Button(action: {
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
+                onCreateGroupPressed()
+            }) {
+                HStack(spacing: 16) {
+                    ZStack {
+                        // 3D layered circle background with enhanced glow
+                        Circle()
+                            .fill(Color(hex: "7289da").opacity(0.4))
+                            .frame(width: 46, height: 46)
+                            .shadow(color: Color(hex: "7289da").opacity(0.6), radius: 12, x: 0, y: 4)
+                            .shadow(color: Color(hex: "7289da").opacity(0.3), radius: 20, x: 0, y: 8)
+                        
+                        Circle()
+                            .fill(Color(hex: "7289da").opacity(0.3))
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color(hex: "7289da").opacity(0.8), lineWidth: 2)
+                            )
+                        
+                        Image(systemName: "plus")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white)
+                            .shadow(color: Color(hex: "7289da").opacity(0.8), radius: 4, x: 0, y: 2)
+                            .scaleEffect(buttonPulseScale)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Create a Group")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .shadow(color: Color(hex: "7289da").opacity(0.5), radius: 2, x: 0, y: 1)
+                        
+                        Text("Start your own exploration team")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .scaleEffect(buttonPulseScale)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(PlainButtonStyle())
+            .scaleEffect(buttonPulseScale)
+            .background(
+                ZStack {
+                    // Base 3D layer - deepest shadow
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color.black.opacity(0.6))
+                        .offset(x: 0, y: 4)
+                        .blur(radius: 8)
+                    
+                    // Main 3D background layer
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color.black.opacity(0.25))
+                        .background(.ultraThinMaterial.opacity(0.5), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
+                        .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
+                    
+                    // 3D highlight gradient overlay
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.15),
+                                    Color.white.opacity(0.06),
+                                    Color.clear,
+                                    Color.black.opacity(0.08)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    
+                    // Inner shadow for depth
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.black.opacity(0.2),
+                                    Color.clear,
+                                    Color.white.opacity(0.12)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.5
+                        )
+                        .blendMode(.overlay)
+                }
+            )
+            .overlay(
+                // Animated chasing border effect
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(
                         AngularGradient(
                             colors: [
-                                Color(hex: "7289da").opacity(0.9),
-                                Color(hex: "7289da").opacity(0.7),
+                                Color.clear,
+                                Color.clear,
+                                Color(hex: "7289da").opacity(0.3),
+                                Color(hex: "5b6eae").opacity(0.8),
+                                Color(hex: "7289da").opacity(1.0),
+                                Color(hex: "8b9dc3").opacity(0.8),
                                 Color(hex: "7289da").opacity(0.3),
                                 Color.clear,
                                 Color.clear,
                                 Color.clear,
-                                Color(hex: "7289da").opacity(0.3),
-                                Color(hex: "7289da").opacity(0.7)
+                                Color(hex: "7289da").opacity(0.2),
+                                Color(hex: "5b6eae").opacity(0.6),
+                                Color(hex: "7289da").opacity(0.8),
+                                Color(hex: "8b9dc3").opacity(0.6),
+                                Color(hex: "7289da").opacity(0.2),
+                                Color.clear
                             ],
                             center: .center,
-                            startAngle: .degrees(chasingAnimationOffset),
-                            endAngle: .degrees(chasingAnimationOffset + 360)
+                            startAngle: .degrees(chasingRotation),
+                            endAngle: .degrees(chasingRotation + 360)
                         ),
                         lineWidth: 3
                     )
-                    .blur(radius: 1)
-                    .animation(.linear(duration: 2.5).repeatForever(autoreverses: false), value: chasingAnimationOffset)
-                
-                // Main button content
-                Button(action: {
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                    impactFeedback.impactOccurred()
-                    onCreateGroupPressed()
-                }) {
-                    HStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .fill(Color(hex: "7289da").opacity(0.2))
-                                .frame(width: 44, height: 44)
-                            
-                            Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(Color(hex: "7289da"))
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Create a Group")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(.white)
-                            
-                            Text("Start your own exploration team")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white.opacity(0.7))
-                        }
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(Color.white.opacity(0.08))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [
-                                                Color.white.opacity(0.2),
-                                                Color.white.opacity(0.05)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 1
-                                    )
-                            )
-                            .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            .scaleEffect(pulseScale)
-            .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: pulseScale)
-            .onAppear { 
-                chasingAnimationOffset = 360
-                pulseScale = 1.05
-            }
+                    .shadow(color: Color(hex: "7289da").opacity(0.4), radius: 8, x: 0, y: 0)
+            )
+            .overlay(
+                // Additional glowing effect
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color(hex: "7289da").opacity(0.3), lineWidth: 1)
+                    .blur(radius: 4)
+                    .scaleEffect(buttonPulseScale * 1.02)
+            )
             .padding(.horizontal, 20)
-            .padding(.bottom, 20)
+            .padding(.bottom, 30)
+            .onAppear {
+                startButtonAnimations()
+            }
+            .onChange(of: isExpanded) { expanded in
+                if expanded {
+                    // Restart animations when panel expands
+                    startButtonAnimations()
+                } else {
+                    // Stop animations when panel collapses
+                    stopButtonAnimations()
+                }
+            }
             
             Spacer()
         }
         .frame(maxWidth: .infinity)
         .frame(height: panelHeight)
         .background(
-            // Enhanced glassmorphism background
-            ZStack {
-                // Primary solid background
-                RoundedRectangle(cornerRadius: 32, style: .continuous)
-                    .fill(Color.black.opacity(0.9))
-                
-                // Gradient overlay for depth
-                RoundedRectangle(cornerRadius: 32, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.black.opacity(0.3),
-                                Color.black.opacity(0.1),
-                                Color.black.opacity(0.2)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                
-                // Subtle border
-                RoundedRectangle(cornerRadius: 32, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.3),
-                                Color.white.opacity(0.1),
-                                Color.white.opacity(0.2)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            }
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(Color.black.opacity(0.2)) // Balanced transparency
+                .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+                .shadow(color: Color.black.opacity(0.15), radius: 15, x: 0, y: 8)
         )
-        .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: 10)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+        )
     }
     
     // MARK: - Group Preview Content (when user has groups)
@@ -396,10 +516,10 @@ struct SmartBottomPanel: View {
                                         .padding(.vertical, 8)
                                         .background(
                                             RoundedRectangle(cornerRadius: 20)
-                                                .fill(tab == "Group" ? Color(hex: "7289da").opacity(0.8) : Color.black.opacity(0.6))
+                                                .fill(tab == "Group" ? Color(hex: "7289da").opacity(0.8) : Color.black.opacity(0.3))
                                                 .overlay(
                                                     RoundedRectangle(cornerRadius: 20)
-                                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
                                                 )
                                         )
                                 }
@@ -426,11 +546,19 @@ struct SmartBottomPanel: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
             .background(
-                Color.black.opacity(0.9)
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .fill(Color.black.opacity(0.2)) // Balanced transparency
+                    .background(.ultraThinMaterial.opacity(0.6), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+                    .shadow(color: Color.black.opacity(0.15), radius: 15, x: 0, y: 8)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
             )
         }
     }
     
+    // MARK: - Helper Functions
     private func infoCard(icon: String, title: String, value: String, color: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
@@ -450,12 +578,74 @@ struct SmartBottomPanel: View {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.black.opacity(0.6))
+                .fill(Color.black.opacity(0.3))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(color.opacity(0.3), lineWidth: 1)
                 )
         )
+    }
+    
+    // MARK: - Notification Functions
+    private func startNotificationCycle() {
+        guard notificationTimer == nil else { return }
+        
+        notificationTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 0.3)) {
+                showingNotification = false
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                currentNotificationType = (currentNotificationType + 1) % 2
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showingNotification = true
+                }
+            }
+        }
+        
+        // Show first notification immediately
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showingNotification = true
+        }
+    }
+    
+    private func stopNotificationCycle() {
+        notificationTimer?.invalidate()
+        notificationTimer = nil
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showingNotification = false
+        }
+    }
+    
+    // MARK: - Button Animation Helpers
+    
+    private func startButtonAnimations() {
+        // Reset rotation to start from beginning
+        chasingRotation = 0
+        
+        // Start chasing border animation
+        withAnimation(
+            .linear(duration: 3.0)
+            .repeatForever(autoreverses: false)
+        ) {
+            chasingRotation = 360
+        }
+        
+        // Start pulsating animation
+        withAnimation(
+            .easeInOut(duration: 1.5)
+            .repeatForever(autoreverses: true)
+        ) {
+            buttonPulseScale = 1.12
+        }
+    }
+    
+    private func stopButtonAnimations() {
+        // Stop animations by setting static values
+        withAnimation(.easeOut(duration: 0.3)) {
+            chasingRotation = 0
+            buttonPulseScale = 1.0
+        }
     }
 }
 
@@ -615,7 +805,8 @@ struct ClayDigitBox: View {
                 currentZoomLevel: 15.0,
                 onGroupsPressed: {},
                 onCreateGroupPressed: {},
-                onJoinGroupPressed: { _ in }
+                onJoinGroupPressed: { _ in },
+                hideNotifications: false
             )
             .environmentObject({
                 let dm = DataManager()

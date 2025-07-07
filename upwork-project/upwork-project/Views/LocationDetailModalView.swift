@@ -179,8 +179,18 @@ struct FullscreenImageView: View {
                                             }
                                         }
                                 } placeholder: {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    Rectangle()
+                                        .fill(Color.gray.opacity(0.2))
+                                        .overlay(
+                                            VStack(spacing: 12) {
+                                                ProgressView()
+                                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                                    .scaleEffect(1.5)
+                                                Text("Loading image...")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.white.opacity(0.7))
+                                            }
+                                        )
                                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 }
                             } else {
@@ -446,52 +456,39 @@ struct LocationDetailModalView: View {
         .onAppear {
             print("🎬 LocationDetailModalView appeared for location: \(location.title) (ID: \(location.id))")
             
-            // Create simple fallback immediately on main thread - no complex operations
-            let quickDetails = LocationDetails(
-                id: location.id,
-                title: location.title,
-                description: location.description,
-                latitude: location.latitude,
-                longitude: location.longitude,
-                address: location.address,
-                viewsCount: 0,
-                likesCount: location.likeCount,
-                bookmarksCount: location.bookmarkCount,
-                commentsCount: 0,
-                submissionDate: "2024-01-01T00:00:00Z", // Simple fallback date
-                featured: false,
-                categoryName: location.categoryName,
-                categoryIcon: nil,
-                categoryColor: nil,
-                dangerLevel: location.dangerLevel,
-                dangerColor: nil,
-                dangerDescription: nil,
-                riskLevel: nil,
-                submittedByUsername: location.submittedByUsername,
-                submittedByAvatar: nil,
-                images: location.images.map { LocationImage(imageUrl: $0, thumbnailUrl: nil, caption: nil) },
-                videos: location.videos.map { LocationVideo(videoUrl: $0, thumbnailUrl: nil, caption: nil) },
-                tags: location.tags,
-                timeline: [],
-                userInteractions: UserInteractions(
-                    isLiked: location.isLiked,
-                    isBookmarked: location.isBookmarked,
-                    hasVisited: false
-                )
-            )
-            
-            // Set immediately for instant UI
-            locationDetails = quickDetails
-            isLoadingDetails = false
-            
-            // Move heavy operations to background
-            Task {
-                // Load fresh details from API in background
-                loadLocationDetails()
+            // Check for cached details first for instant loading
+            if let cachedDetails = dataManager.getCachedLocationDetails(locationId: location.id) {
+                print("⚡ Using cached location details for instant load")
+                locationDetails = cachedDetails
+                isLoadingDetails = false
                 
-                // Load other data in background
+                // Still load fresh data in background, but no rush
+                Task {
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
+                    await loadLocationDetailsAsync()
+                }
+            } else {
+                // Instant UI with minimal object creation
+                locationDetails = createMinimalLocationDetails()
+                isLoadingDetails = false
+                
+                // Load fresh details immediately
+                Task {
+                    await loadLocationDetailsAsync()
+                }
+            }
+            
+            // Progressive loading for other data
+            Task {
+                // Load comments with delay to avoid blocking
+                try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 second delay
                 await MainActor.run {
                     loadComments()
+                }
+                
+                // Load secondary data with more delay
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
+                await MainActor.run {
                     trackViewIfNeeded()
                     loadNearbyLocations()
                     
@@ -1143,6 +1140,42 @@ struct LocationDetailModalView: View {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
     
+    // Fast minimal object creation for instant UI
+    private func createMinimalLocationDetails() -> LocationDetails {
+        return LocationDetails(
+            id: location.id,
+            title: location.title,
+            description: location.description,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            address: location.address,
+            viewsCount: 0,
+            likesCount: location.likeCount ?? 0,
+            bookmarksCount: location.bookmarkCount ?? 0,
+            commentsCount: 0,
+            submissionDate: "2024-01-01T00:00:00Z",
+            featured: false,
+            categoryName: location.categoryName,
+            categoryIcon: nil,
+            categoryColor: nil,
+            dangerLevel: location.dangerLevel,
+            dangerColor: nil,
+            dangerDescription: nil,
+            riskLevel: nil,
+            submittedByUsername: location.submittedByUsername,
+            submittedByAvatar: nil,
+            images: location.images.map { LocationImage(imageUrl: $0, thumbnailUrl: nil, caption: nil) },
+            videos: location.videos.map { LocationVideo(videoUrl: $0, thumbnailUrl: nil, caption: nil) },
+            tags: location.tags,
+            timeline: [],
+            userInteractions: UserInteractions(
+                isLiked: location.isLiked ?? false,
+                isBookmarked: location.isBookmarked ?? false,
+                hasVisited: false
+            )
+        )
+    }
+    
     private func loadLocationDetails() {
         print("🎬 LocationDetailModalView: Starting to load details for location ID: \(location.id)")
         
@@ -1168,8 +1201,11 @@ struct LocationDetailModalView: View {
                         locationDetails = response.location
                     }
                     
-                    // Preload media for this location in background
-                    DispatchQueue.global(qos: .background).async {
+                    // Cache the fresh details for future use
+                    dataManager.cacheLocationDetails(response.location)
+                    
+                    // Preload images in background (non-blocking)
+                    Task.detached(priority: .background) {
                         let mediaUrls = response.location.images.map { $0.imageUrl } + 
                                        response.location.videos.compactMap { $0.thumbnailUrl }
                         if !mediaUrls.isEmpty {
@@ -1181,6 +1217,53 @@ struct LocationDetailModalView: View {
                 }
             )
             .store(in: &cancellables)
+    }
+    
+    // Async version for better performance
+    private func loadLocationDetailsAsync() async {
+        print("🎬 LocationDetailModalView: Starting async load for location ID: \(location.id)")
+        
+        do {
+            let response = try await withCheckedThrowingContinuation { continuation in
+                dataManager.apiService.getLocationDetails(locationId: location.id)
+                    .receive(on: DispatchQueue.main)
+                    .sink(
+                        receiveCompletion: { completion in
+                            if case .failure(let error) = completion {
+                                continuation.resume(throwing: error)
+                            }
+                        },
+                        receiveValue: { response in
+                            continuation.resume(returning: response)
+                        }
+                    )
+                    .store(in: &cancellables)
+            }
+            
+            print("✅ Async location details loaded: \(response.location.title)")
+            
+            // Update UI smoothly on main actor
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    locationDetails = response.location
+                }
+                // Cache the fresh details for future use
+                dataManager.cacheLocationDetails(response.location)
+            }
+            
+            // Preload images in background (non-blocking)
+            Task.detached(priority: .background) {
+                let mediaUrls = response.location.images.map { $0.imageUrl } + 
+                               response.location.videos.compactMap { $0.thumbnailUrl }
+                if !mediaUrls.isEmpty {
+                    ImageCache.shared.preloadImages(urls: mediaUrls, limitToWiFi: false)
+                }
+            }
+            
+        } catch {
+            print("❌ Failed to load location details async: \(error.localizedDescription)")
+            // Don't show error immediately - user already sees content
+        }
     }
     
     private func loadComments() {

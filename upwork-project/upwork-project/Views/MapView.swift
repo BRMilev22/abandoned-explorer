@@ -119,6 +119,8 @@ struct MapView: View {
                 geocodingService.reverseGeocode(coordinate: center, zoomLevel: currentZoomLevel)
                 loadActiveUsers()
                 checkAndLoadLocationsForNewArea(center: center)
+                // Load real statistics for notifications
+                dataManager.loadNearbyStatistics(latitude: center.latitude, longitude: center.longitude)
             }
         )
     }
@@ -145,13 +147,17 @@ struct MapView: View {
                 geocodingService.reverseGeocode(coordinate: center, zoomLevel: currentZoomLevel)
                 loadActiveUsers()
                 checkAndLoadLocationsForNewArea(center: center)
+                // Load real statistics for notifications
+                dataManager.loadNearbyStatistics(latitude: center.latitude, longitude: center.longitude)
             }
         )
     }
     
     @ViewBuilder
     private var socialFeedView: some View {
-        FeedView()
+        FeedView(onBackToOutpost: {
+            selectedLocationCategory = "Outpost"
+        })
             .environmentObject(dataManager)
             .environmentObject(locationManager)
     }
@@ -173,7 +179,8 @@ struct MapView: View {
             
             // Radar effect overlay - positioned at actual user location marker
             // Uses exact same zoom logic as SmartBottomPanel for synchronized visibility
-            if let userLocation = locationManager.userLocation {
+            // Only show in Outpost and Verified Map views, not in Social Feed
+            if let userLocation = locationManager.userLocation, selectedLocationCategory != "Social Feed" {
                 RadarPositionTracker(userLocation: userLocation)
                     .allowsHitTesting(false)
                     .opacity(shouldShowRadar ? 1.0 : 0.0)
@@ -182,65 +189,78 @@ struct MapView: View {
             }
             
             // Add center button in bottom right corner
-            VStack {
-                Spacer()
-                HStack {
+            // Only show in Outpost and Verified Map views, not in Social Feed
+            if selectedLocationCategory != "Social Feed" {
+                VStack {
                     Spacer()
-                    Button(action: centerOnUser) {
-                        Image(systemName: "location.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
-                            .background(Color.black.opacity(0.8))
-                            .clipShape(Circle())
-                            .shadow(color: Color.black.opacity(0.3), radius: 5)
+                    HStack {
+                        Spacer()
+                        Button(action: centerOnUser) {
+                            Image(systemName: "location.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Color.black.opacity(0.8))
+                                .clipShape(Circle())
+                                .shadow(color: Color.black.opacity(0.3), radius: 5)
+                        }
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 100) // Adjust based on your bottom panel height
                     }
-                    .padding(.trailing, 16)
-                    .padding(.bottom, 100) // Adjust based on your bottom panel height
                 }
+                .opacity(showCenterButton ? 1 : 0)
             }
-            .opacity(showCenterButton ? 1 : 0)
             
             // Header Overlay - Updated to use new OutpostHeaderView
-            VStack {
-                OutpostHeaderView(
-                    selectedCategory: $selectedLocationCategory,
-                    showingSelector: $showingLocationSelector,
-                    showingProfile: $showingProfile,
-                    showingNotifications: $showingNotifications,
-                    nearbyUserCount: nearbyUserCount,
-                    isGlobalView: currentZoomLevel < 10.0,
-                    currentLocationName: geocodingService.currentLocationName,
-                    geocodingService: geocodingService,
-                    currentZoomLevel: currentZoomLevel,
-                    onRefreshUsers: {
-                        // Force refresh active users when user taps on count
-                        print("🔄 Forcing active users refresh from header tap")
-                        clearActiveUsersCache()
-                        loadActiveUsers()
-                    }
-                )
-                .environmentObject(dataManager)
-                
-                Spacer()
-                
-                // Smart Bottom Panel - replaces the old ZoomAwareBottomBanner
-                SmartBottomPanel(
-                    currentLocationName: geocodingService.currentLocationName,
-                    currentZoomLevel: currentZoomLevel,
-                    onGroupsPressed: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingGroups = true
+            // Only show header in Outpost and Verified Map views, not in Social Feed
+            if selectedLocationCategory != "Social Feed" {
+                VStack {
+                    OutpostHeaderView(
+                        selectedCategory: $selectedLocationCategory,
+                        showingSelector: $showingLocationSelector,
+                        showingProfile: $showingProfile,
+                        showingNotifications: $showingNotifications,
+                        nearbyUserCount: nearbyUserCount,
+                        isGlobalView: currentZoomLevel < 10.0,
+                        currentLocationName: geocodingService.currentLocationName,
+                        geocodingService: geocodingService,
+                        currentZoomLevel: currentZoomLevel,
+                        onRefreshUsers: {
+                            // Force refresh active users when user taps on count
+                            print("🔄 Forcing active users refresh from header tap")
+                            clearActiveUsersCache()
+                            loadActiveUsers()
                         }
-                    },
-                    onCreateGroupPressed: {
-                        showingCreateGroup = true
-                    },
-                    onJoinGroupPressed: { code in
-                        showingJoinGroup = true
-                    }
-                )
-                .environmentObject(dataManager)
+                    )
+                    .environmentObject(dataManager)
+                
+                    Spacer()
+                }
+            }
+            
+            // Smart Bottom Panel - replaces the old ZoomAwareBottomBanner
+            // Only show in Outpost and Verified Map views, not in Social Feed
+            if selectedLocationCategory != "Social Feed" {
+                VStack {
+                    Spacer()
+                    SmartBottomPanel(
+                        currentLocationName: geocodingService.currentLocationName,
+                        currentZoomLevel: currentZoomLevel,
+                        onGroupsPressed: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingGroups = true
+                            }
+                        },
+                        onCreateGroupPressed: {
+                            showingCreateGroup = true
+                        },
+                        onJoinGroupPressed: { code in
+                            showingJoinGroup = true
+                        },
+                        hideNotifications: false // Always false since we're not showing in feed view
+                    )
+                    .environmentObject(dataManager)
+                }
             }
             
             // Loading indicator
@@ -478,6 +498,9 @@ struct MapView: View {
                 
                 // Update user's location in the backend for active users tracking
                 dataManager.updateUserLocation(latitude: location.latitude, longitude: location.longitude)
+                
+                // Load real nearby statistics for notifications
+                dataManager.loadNearbyStatistics(latitude: location.latitude, longitude: location.longitude)
             } else {
                 print("📍 User location changed: nil")
             }

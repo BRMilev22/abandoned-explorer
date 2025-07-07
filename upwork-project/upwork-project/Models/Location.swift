@@ -346,9 +346,13 @@ enum NotificationType: String, Codable, CaseIterable {
     case groupInvite = "group_invite"
     case groupKick = "group_kick"
     case groupBan = "group_ban"
+    case groupUnban = "group_unban"
     case groupMessage = "group_message"
-    case groupPromotion = "group_promotion"
-    case groupDemotion = "group_demotion"
+    case groupPromotion = "group_promote"
+    case groupDemotion = "group_demote"
+    case groupMemberKick = "group_member_kick"
+    case groupMemberBan = "group_member_ban"
+    case groupMemberRoleChange = "group_member_role_change"
     
     var icon: String {
         switch self {
@@ -370,9 +374,13 @@ enum NotificationType: String, Codable, CaseIterable {
         case .groupInvite: return "envelope.badge"
         case .groupKick: return "person.crop.circle.badge.xmark"
         case .groupBan: return "person.crop.circle.badge.exclamationmark"
+        case .groupUnban: return "person.crop.circle.badge.checkmark"
         case .groupMessage: return "message.badge"
         case .groupPromotion: return "arrow.up.circle.badge.clock"
         case .groupDemotion: return "arrow.down.circle.badge.clock"
+        case .groupMemberKick: return "person.2.badge.minus"
+        case .groupMemberBan: return "person.2.badge.xmark"
+        case .groupMemberRoleChange: return "person.2.badge.gearshape"
         }
     }
     
@@ -396,9 +404,13 @@ enum NotificationType: String, Codable, CaseIterable {
         case .groupInvite: return "blue"
         case .groupKick: return "red"
         case .groupBan: return "red"
+        case .groupUnban: return "green"
         case .groupMessage: return "blue"
         case .groupPromotion: return "green"
         case .groupDemotion: return "orange"
+        case .groupMemberKick: return "red"
+        case .groupMemberBan: return "red"
+        case .groupMemberRoleChange: return "blue"
         }
     }
     
@@ -422,9 +434,13 @@ enum NotificationType: String, Codable, CaseIterable {
         case .groupInvite: return "Group Invite"
         case .groupKick: return "Removed from Group"
         case .groupBan: return "Banned from Group"
+        case .groupUnban: return "Group Unban"
         case .groupMessage: return "Group Message"
         case .groupPromotion: return "Group Promotion"
         case .groupDemotion: return "Group Demotion"
+        case .groupMemberKick: return "Member Removed"
+        case .groupMemberBan: return "Member Banned"
+        case .groupMemberRoleChange: return "Role Changed"
         }
     }
 }

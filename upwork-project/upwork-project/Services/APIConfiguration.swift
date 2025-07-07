@@ -13,7 +13,7 @@ struct APIConfiguration {
     private init() {}
     
     #if DEBUG
-    let baseURL = "http://192.168.0.116:3000/api"
+    let baseURL = "http://192.168.1.106:3000/api"
     #else
     let baseURL = "https://your-production-api.com/api" // Replace with your production URL
     #endif
