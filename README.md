@@ -6,7 +6,31 @@
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-5.0-blue.svg)](https://developer.apple.com/xcode/swiftui/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0+-orange.svg)](https://www.mysql.com/)
-[![License](https://img.shields.io/badge/License-Proprietary-red.svg)]()
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
+
+## App Screenshots
+
+<div align="center">
+
+<table>
+<tr>
+<td align="center"><img src="images/main-screen.png" alt="Main Screen" width="200"/><br><b>Main Screen</b><br><em>Interactive map with location clustering</em></td>
+<td align="center"><img src="images/main-screen-zoomed-out.png" alt="Map Overview" width="200"/><br><b>Map Overview</b><br><em>Zoomed out view with location clusters</em></td>
+<td align="center"><img src="images/discover-screen-1.png" alt="Discover Screen" width="200"/><br><b>Discover</b><br><em>Location discovery and exploration</em></td>
+</tr>
+<tr>
+<td align="center"><img src="images/discover-screen2.png" alt="Location Details" width="200"/><br><b>Discover View</b><br><em>Detailed location information</em></td>
+<td align="center"><img src="images/location-detail.png" alt="Location Detail" width="200"/><br><b>Location Detail</b><br><em>Full location information and media</em></td>
+<td align="center"><img src="images/feed-view.png" alt="Feed View" width="200"/><br><b>Feed View</b><br><em>Community posts and discoveries</em></td>
+</tr>
+<tr>
+<td align="center"><img src="images/profile-screen-user.png" alt="Profile Screen" width="200"/><br><b>Profile</b><br><em>User profile and statistics</em></td>
+<td align="center"><img src="images/notifications.png" alt="Notifications" width="200"/><br><b>Notifications</b><br><em>Real-time activity updates</em></td>
+<td align="center"><img src="images/admin-panel.png" alt="Admin Panel" width="200"/><br><b>Admin Panel</b><br><em>Content moderation tools</em></td>
+</tr>
+</table>
+
+</div>
 
 ## Features
 
