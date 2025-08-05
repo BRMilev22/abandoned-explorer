@@ -259,6 +259,13 @@ class APIService: ObservableObject {
         return makeRequest(endpoint: "/locations/by-comment/\(commentId)", responseType: LocationByCommentResponse.self)
     }
     
+    // MARK: - USA Locations Methods
+    
+    func getRandomUSALocations(latitude: Double, longitude: Double, radius: Int = 50, limit: Int = 10) -> AnyPublisher<USALocationsResponse, APIError> {
+        let endpoint = "/locations-usa/random?lat=\(latitude)&lng=\(longitude)&radius=\(radius)&limit=\(limit)"
+        return makeRequest(endpoint: endpoint, responseType: USALocationsResponse.self)
+    }
+    
     func submitLocation(_ location: LocationSubmission) -> AnyPublisher<LocationSubmissionResponse, APIError> {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -1123,6 +1130,39 @@ struct ActiveUsersQuery: Codable {
 struct LocationCoordinate: Codable {
     let latitude: Double
     let longitude: Double
+    
+    enum CodingKeys: String, CodingKey {
+        case latitude, longitude
+        case lat, lng
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Handle latitude/lat - can be either format
+        if let latDouble = try? container.decode(Double.self, forKey: .latitude) {
+            latitude = latDouble
+        } else if let latDouble = try? container.decode(Double.self, forKey: .lat) {
+            latitude = latDouble
+        } else {
+            latitude = 0.0
+        }
+        
+        // Handle longitude/lng - can be either format
+        if let lngDouble = try? container.decode(Double.self, forKey: .longitude) {
+            longitude = lngDouble
+        } else if let lngDouble = try? container.decode(Double.self, forKey: .lng) {
+            longitude = lngDouble
+        } else {
+            longitude = 0.0
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(latitude, forKey: .latitude)
+        try container.encode(longitude, forKey: .longitude)
+    }
 }
 
 struct ActiveUser: Codable, Identifiable {
@@ -1586,5 +1626,116 @@ struct LocationByCommentResponse: Codable {
         } else {
             commentId = 0
         }
+    }
+}
+
+struct USALocation: Codable, Identifiable {
+    let id: Int
+    let uuid: String
+    let title: String
+    let description: String
+    let latitude: Double
+    let longitude: Double
+    let address: String?
+    let categoryName: String?
+    let categoryIcon: String?
+    let dangerLevel: String?
+    let dangerColor: String?
+    let buildingType: String?
+    let originalTags: String?
+    let createdAt: Date
+    let distance: Double
+    let distanceKm: Double
+    let source: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id, uuid, title, description, latitude, longitude, address, distance, source
+        case categoryName = "category_name"
+        case categoryIcon = "category_icon"
+        case dangerLevel = "danger_level"
+        case dangerColor = "danger_color"
+        case buildingType = "building_type"
+        case originalTags = "original_tags"
+        case createdAt = "created_at"
+        case distanceKm = "distance_km"
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(Int.self, forKey: .id)
+        uuid = try container.decode(String.self, forKey: .uuid)
+        title = try container.decode(String.self, forKey: .title)
+        description = try container.decode(String.self, forKey: .description)
+        address = try container.decodeIfPresent(String.self, forKey: .address)
+        categoryName = try container.decodeIfPresent(String.self, forKey: .categoryName)
+        categoryIcon = try container.decodeIfPresent(String.self, forKey: .categoryIcon)
+        dangerLevel = try container.decodeIfPresent(String.self, forKey: .dangerLevel)
+        dangerColor = try container.decodeIfPresent(String.self, forKey: .dangerColor)
+        buildingType = try container.decodeIfPresent(String.self, forKey: .buildingType)
+        originalTags = try container.decodeIfPresent(String.self, forKey: .originalTags)
+        source = try container.decode(String.self, forKey: .source)
+        
+        // Handle latitude - can be string or double
+        if let latDouble = try? container.decode(Double.self, forKey: .latitude) {
+            latitude = latDouble
+        } else if let latString = try? container.decode(String.self, forKey: .latitude) {
+            latitude = Double(latString) ?? 0.0
+        } else {
+            latitude = 0.0
+        }
+        
+        // Handle longitude - can be string or double
+        if let lngDouble = try? container.decode(Double.self, forKey: .longitude) {
+            longitude = lngDouble
+        } else if let lngString = try? container.decode(String.self, forKey: .longitude) {
+            longitude = Double(lngString) ?? 0.0
+        } else {
+            longitude = 0.0
+        }
+        
+        // Handle distance - can be string or double
+        if let distanceDouble = try? container.decode(Double.self, forKey: .distance) {
+            distance = distanceDouble
+        } else {
+            distance = 0.0
+        }
+        
+        // Handle distanceKm - can be string or double
+        if let distanceDouble = try? container.decode(Double.self, forKey: .distanceKm) {
+            distanceKm = distanceDouble
+        } else if let distanceString = try? container.decode(String.self, forKey: .distanceKm) {
+            distanceKm = Double(distanceString) ?? 0.0
+        } else {
+            distanceKm = 0.0
+        }
+        
+        // Handle created_at date - use simple string parsing for now
+        if let dateString = try? container.decode(String.self, forKey: .createdAt) {
+            let formatter = ISO8601DateFormatter()
+            createdAt = formatter.date(from: dateString) ?? Date()
+        } else {
+            createdAt = Date()
+        }
+    }
+}
+
+struct USALocationCenter: Codable {
+    let lat: Double
+    let lng: Double
+}
+
+struct USALocationsResponse: Codable {
+    let success: Bool
+    let locations: [USALocation]
+    let total: Int
+    let radiusKm: Int
+    let center: USALocationCenter
+    let queryType: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case success, locations, total, center
+        case radiusKm = "radius_km"
+        case queryType = "query_type"
     }
 }

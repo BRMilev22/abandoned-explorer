@@ -12,6 +12,7 @@ import Combine
 struct MainTabView: View {
     @EnvironmentObject var dataManager: DataManager
     @StateObject private var locationManager = LocationManager()
+    @StateObject private var geocodingService = GeocodingService()
     @State private var selectedTab = 0
     
     var body: some View {
@@ -23,16 +24,15 @@ struct MainTabView: View {
                 }
                 .tag(0)
             
-            KeyAlertsView(
-                locations: dataManager.getApprovedLocations(),
+            LocationSuggestionView(
                 userLocation: locationManager.userLocation,
-                currentLocationName: "Your Area"
+                currentLocationName: geocodingService.currentLocationName
             )
                 .environmentObject(dataManager)
                 .environmentObject(locationManager)
                 .tabItem {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                    Text("Alert")
+                    Image(systemName: "location.magnifyingglass")
+                    Text("Discover")
                 }
                 .tag(1)
             

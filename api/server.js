@@ -13,6 +13,7 @@ const { testConnection } = require('./config/database');
 // Import routes
 const authRoutes = require('./routes/auth');
 const locationRoutes = require('./routes/locations');
+const locationsUsaRoutes = require('./routes/locations_usa');
 const userRoutes = require('./routes/users');
 const uploadRoutes = require('./routes/upload_local');
 const adminRoutes = require('./routes/admin');
@@ -126,6 +127,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/locations-usa', locationsUsaRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/admin', adminRoutes);

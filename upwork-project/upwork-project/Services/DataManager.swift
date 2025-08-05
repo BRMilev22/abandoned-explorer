@@ -1430,6 +1430,30 @@ class DataManager: ObservableObject {
             .store(in: &cancellables)
     }
     
+    // MARK: - USA Locations Methods
+    
+    func getRandomUSALocations(latitude: Double, longitude: Double, radius: Int = 50, limit: Int = 10) async throws -> [USALocation] {
+        print("🇺🇸 Fetching random USA locations near \(latitude), \(longitude)")
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            apiService.getRandomUSALocations(latitude: latitude, longitude: longitude, radius: radius, limit: limit)
+                .receive(on: DispatchQueue.main)
+                .sink(
+                    receiveCompletion: { completion in
+                        if case .failure(let error) = completion {
+                            print("❌ Failed to fetch random USA locations: \(error)")
+                            continuation.resume(throwing: error)
+                        }
+                    },
+                    receiveValue: { response in
+                        print("✅ Successfully fetched \(response.locations.count) random USA locations")
+                        continuation.resume(returning: response.locations)
+                    }
+                )
+                .store(in: &self.cancellables)
+        }
+    }
+    
     func fetchLocationDetails(locationId: Int) async throws -> AbandonedLocation {
         print("🔍 Fetching location details for ID: \(locationId)")
         

@@ -20,7 +20,7 @@ struct MapView: View {
     @State private var showingLocationSelector = false
     @State private var selectedLocationCategory = "Outpost"
     @State private var showingProfile = false
-    @State private var showingKeyAlerts = false
+
     @State private var showingGroups = false
     @State private var showingNotifications = false
     @State private var showingCreateGroup = false
@@ -379,13 +379,7 @@ struct MapView: View {
         .sheet(isPresented: $showingProfile) {
             ProfileView()
         }
-        .sheet(isPresented: $showingKeyAlerts) {
-            KeyAlertsView(
-                locations: dataManager.getApprovedLocations(),
-                userLocation: currentMapCenter ?? locationManager.userLocation,
-                currentLocationName: geocodingService.currentLocationName
-            )
-        }
+
 
         .sheet(isPresented: $showingNotifications) {
             NotificationsView()

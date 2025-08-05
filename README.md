@@ -1,6 +1,6 @@
-# 🏚️ Abandoned Explorer
+# Abandoned Explorer
 
-> **A comprehensive iOS app and API platform for discovering, documenting, and exploring abandoned locations worldwide**
+> **A comprehensive iOS app and API platform for discovering, documenting, and exploring abandoned locations across the United States. Abandoned Explorer is the ultimate urban exploration companion that combines a vast database of over 3,000 verified abandoned locations with social features, location discovery tools, and community-driven content. Whether you're a seasoned urban explorer or curious about forgotten places in your area, this app provides everything you need to safely discover, document, and share your exploration experiences with fellow adventurers.**
 
 [![iOS](https://img.shields.io/badge/iOS-17.0+-blue.svg)](https://developer.apple.com/ios/)
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-5.0-blue.svg)](https://developer.apple.com/xcode/swiftui/)
@@ -8,37 +8,41 @@
 [![MySQL](https://img.shields.io/badge/MySQL-8.0+-orange.svg)](https://www.mysql.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)]()
 
-## 🌟 Features
+## Features
 
-### 📱 **iOS App (SwiftUI)**
-- **🗺️ Interactive Map** - Mapbox-powered map with efficient clustering for 10,000+ locations
-- **👥 Groups System** - Create, join, and manage exploration groups with real-time chat
-- **📸 Media Upload** - Submit locations with photos and videos
-- **🔔 Real-time Notifications** - Get notified about group activities, location approvals, and more
-- **👤 User Profiles** - Track submissions, bookmarks, and exploration statistics
-- **⚡ Modern UI** - Beautiful animations, dark theme, and responsive design
-- **🌍 Regional Discovery** - Location-based grouping and exploration
-- **🛡️ Admin Panel** - Built-in moderation tools for administrators
+### **iOS App (SwiftUI)**
+- **Interactive Map** - Mapbox-powered map with efficient clustering for thousands of locations
+- **Groups System** - Create, join, and manage exploration groups with friends for collaborative adventures
+- **Local Location Discovery** - Generate new abandoned locations in your area using AI-powered suggestions
+- **Community Posting** - Share and post about newly discovered locations to make them public on the map
+- **Media Upload** - Submit locations with high-quality photos and videos
+- **Real-time Notifications** - Get notified about group activities, location approvals, and friend discoveries
+- **User Profiles** - Track submissions, bookmarks, exploration statistics, and friend connections
+- **Modern UI** - Beautiful animations, dark theme, and responsive design optimized for exploration
+- **Regional Discovery** - Location-based grouping and exploration with detailed area insights
+- **Admin Panel** - Built-in moderation tools for administrators and community management
 
-### 🖥️ **Backend API (Node.js/Express)**
-- **🔐 JWT Authentication** - Secure user authentication and authorization
-- **📍 Location Management** - CRUD operations with spatial indexing and nearby search
-- **👥 Groups API** - Complete group management with roles, permissions, and chat
-- **📤 Media Upload** - Image and video upload with automatic thumbnail generation
-- **🔔 Notification System** - Real-time notifications for all user activities
-- **👨‍💼 Admin Tools** - Location approval workflow and user management
-- **📊 Analytics** - User activity tracking and statistics
-- **📚 API Documentation** - Comprehensive Swagger/OpenAPI documentation
+### **Backend API (Node.js/Express)**
+- **JWT Authentication** - Secure user authentication and authorization system
+- **Location Management** - CRUD operations with spatial indexing and nearby search capabilities
+- **Groups API** - Complete group management with roles, permissions, and real-time chat functionality
+- **Location Generation** - AI-powered system for suggesting new abandoned locations in user's area
+- **Media Upload** - Image and video upload with automatic thumbnail generation and optimization
+- **Notification System** - Real-time notifications for all user activities and group interactions
+- **Admin Tools** - Location approval workflow, user management, and content moderation
+- **Analytics** - User activity tracking, exploration statistics, and engagement metrics
+- **API Documentation** - Comprehensive Swagger/OpenAPI documentation for all endpoints
 
-### 🗄️ **Database (MySQL)**
-- **📍 Spatial Indexing** - Optimized for fast location queries and proximity searches
-- **👥 Groups Schema** - Complete group management with roles, bans, and message history
-- **🔔 Notifications** - Comprehensive notification system with read status
-- **📊 Analytics Tables** - User activity, location statistics, and engagement metrics
-- **🛡️ Security** - Proper foreign key relationships and data integrity constraints
-- **⚡ Performance** - Optimized indexes for queries handling millions of records
+### **Database (MySQL)**
+- **Pre-loaded Content** - Over 3,000 verified abandoned locations across the United States included in the SQL file
+- **Spatial Indexing** - Optimized for fast location queries and proximity searches within specified radius
+- **Groups Schema** - Complete group management with roles, bans, message history, and friend connections
+- **Notifications** - Comprehensive notification system with read status and activity tracking
+- **Analytics Tables** - User activity, location statistics, exploration metrics, and community engagement
+- **Security** - Proper foreign key relationships and data integrity constraints for safe data management
+- **Performance** - Optimized indexes for queries handling millions of records and concurrent users
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
@@ -53,7 +57,7 @@
    └───────┘                └─────────┘             └─────────┘
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -62,7 +66,14 @@
 - **Xcode** 15+ (for iOS development)
 - **iOS** 17.0+ (deployment target)
 
-### 1. Database Setup
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/BRMilev22/abandoned-explorer.git
+cd abandoned-explorer
+```
+
+### 2. Database Setup
 
 ```bash
 # Connect to MySQL
@@ -77,7 +88,7 @@ mysql -u root -p abandoned_explorer < database/abandoned-explorer.sql
 mysql -u root -p abandoned_explorer < database/abandoned-explorer-new.sql
 ```
 
-### 2. API Server Setup
+### 3. API Server Setup
 
 ```bash
 # Navigate to API directory
@@ -93,7 +104,7 @@ npm start
 **API will be available at:** `http://localhost:3000`  
 **API Documentation:** `http://localhost:3000/api-docs`
 
-### 3. iOS App Setup
+### 4. iOS App Setup
 
 ```bash
 # Install CocoaPods dependencies
@@ -113,7 +124,7 @@ open upwork-project.xcworkspace
 | Table | Purpose | Records |
 |-------|---------|---------|
 | `users` | User accounts and profiles | 350+ sample users |
-| `locations` | Abandoned places with spatial data | Production-ready schema |
+| `locations` | Abandoned places with spatial data | 3,000+ pre-loaded US locations |
 | `groups` | Exploration groups | Complete group system |
 | `group_messages` | Real-time chat messages | Message history |
 | `group_members` | Group membership and roles | Role-based permissions |
@@ -128,16 +139,16 @@ open upwork-project.xcworkspace
 - **Region-based Grouping** for localized exploration
 - **Comprehensive Notification System** for all user activities
 
-## 🔌 API Endpoints
+## API Endpoints
 
-### 🔐 Authentication
+### Authentication
 ```http
 POST /api/auth/register    # User registration
 POST /api/auth/login       # User login
 GET  /api/auth/me          # Current user profile
 ```
 
-### 📍 Locations
+### Locations
 ```http
 GET  /api/locations/nearby       # Locations by radius
 GET  /api/locations/feed         # Paginated location feed
@@ -147,7 +158,7 @@ POST /api/locations/:id/like     # Toggle like
 POST /api/locations/:id/bookmark # Toggle bookmark
 ```
 
-### 👥 Groups
+### Groups
 ```http
 GET    /api/groups                    # User's groups
 POST   /api/groups                    # Create group
@@ -160,52 +171,54 @@ POST   /api/groups/:id/ban            # Ban member (admin)
 POST   /api/groups/:id/promote        # Promote/demote member
 ```
 
-### 🔔 Notifications
+### Notifications
 ```http
 GET  /api/users/notifications         # User notifications
 POST /api/users/notifications/:id/read # Mark as read
 ```
 
-### 👨‍💼 Admin (Protected)
+### Admin (Protected)
 ```http
 GET  /api/admin/locations/pending     # Pending approvals
 POST /api/admin/locations/:id/approve # Approve location
 GET  /api/admin/stats                 # System statistics
 ```
 
-### 📤 Upload
+### Upload
 ```http
 POST /api/upload/images               # Upload images
 POST /api/upload/videos               # Upload videos
 ```
 
-## 📱 iOS App Structure
+## iOS App Structure
 
 ```
 upwork-project/
-├── 📱 Views/
-│   ├── 🗺️ MapView.swift              # Interactive map with clustering
-│   ├── 🔐 AuthenticationView.swift   # Login/register flow
-│   ├── 👤 ProfileView.swift          # User profiles and stats
-│   ├── 👥 GroupsView.swift           # Groups management
-│   ├── 💬 GroupChatView.swift        # Real-time group chat
-│   ├── 📝 SubmitLocationView.swift   # Location submission
-│   ├── 🔔 NotificationsView.swift    # Notification center
-│   └── 👨‍💼 AdminPanelView.swift       # Admin tools
-├── 🛠️ Services/
-│   ├── 🌐 APIService.swift           # Network layer
-│   ├── 📊 DataManager.swift          # State management
-│   ├── 📍 LocationManager.swift      # GPS and location services
-│   └── 🗺️ MapboxConfiguration.swift  # Map configuration
-├── 📦 Models/
-│   ├── 📍 Location.swift             # Location data model
-│   ├── 👤 User.swift                 # User data model
-│   └── 👥 Group.swift                # Group data model
-└── 🎨 Extensions/
-    └── 🎨 Color+Hex.swift            # UI utilities
+├── Views/
+│   ├── MapView.swift              # Interactive map with clustering and location discovery
+│   ├── AuthenticationView.swift   # Login/register flow
+│   ├── ProfileView.swift          # User profiles and exploration stats
+│   ├── GroupsView.swift           # Groups management and friend connections
+│   ├── GroupChatView.swift        # Real-time group chat and coordination
+│   ├── SubmitLocationView.swift   # Location submission and community posting
+│   ├── LocationDiscoveryView.swift # AI-powered local location generation
+│   ├── NotificationsView.swift    # Notification center and activity feed
+│   └── AdminPanelView.swift       # Admin tools and content moderation
+├── Services/
+│   ├── APIService.swift           # Network layer and API communication
+│   ├── DataManager.swift          # State management and data persistence
+│   ├── LocationManager.swift      # GPS, location services, and area detection
+│   ├── LocationGeneratorService.swift # AI-powered location discovery service
+│   └── MapboxConfiguration.swift  # Map configuration and clustering
+├── Models/
+│   ├── Location.swift             # Location data model with discovery status
+│   ├── User.swift                 # User data model with friend connections
+│   └── Group.swift                # Group data model with exploration features
+└── Extensions/
+    └── Color+Hex.swift            # UI utilities and theme management
 ```
 
-## 🚀 Production Deployment
+## Production Deployment
 
 ### Backend Deployment
 
@@ -261,7 +274,7 @@ pm2 start server.js --name "abandoned-explorer-api"
    - Archive and upload via Xcode
    - Complete App Store review process
 
-## ⚡ Performance Features
+## Performance Features
 
 ### Database Optimizations
 - **Spatial indexes** for location queries (`POINT` data type with `SPATIAL INDEX`)
@@ -281,7 +294,7 @@ pm2 start server.js --name "abandoned-explorer-api"
 - **Regional data loading** to minimize memory usage
 - **Background location updates** for seamless experience
 
-## 🔒 Security Features
+## Security Features
 
 - **JWT Authentication** with secure token management
 - **Password hashing** using bcrypt with salt rounds
@@ -291,7 +304,7 @@ pm2 start server.js --name "abandoned-explorer-api"
 - **Role-based access control** for admin functions
 - **Input validation** on all API endpoints
 
-## 🧪 Testing
+## Testing
 
 ### Backend Testing
 ```bash
@@ -311,21 +324,27 @@ npm run test:coverage       # Coverage report
 - **Integration tests** for API communication
 - **UI tests** for critical user flows
 
-## 🎯 Key Features Deep Dive
+## Key Features Deep Dive
 
-### Groups System
-- **Real-time Chat** with message history and replies
-- **Role Management** (Owner → Admin → Member)
-- **Moderation Tools** (kick, ban, promote/demote)
-- **Regional Grouping** for localized exploration
-- **Comprehensive Notifications** for all group activities
+### Groups System and Friend Exploration
+- **Real-time Chat** with message history, replies, and exploration coordination
+- **Friend Connections** for building exploration communities and sharing discoveries
+- **Role Management** (Owner → Admin → Member) with exploration-specific permissions
+- **Group Exploration Planning** with location sharing and meetup coordination
+- **Moderation Tools** (kick, ban, promote/demote) for maintaining community standards
+- **Regional Grouping** for localized exploration and area-specific discussions
+- **Comprehensive Notifications** for all group activities, friend requests, and exploration updates
 
-### Location Management
-- **Spatial Queries** for finding nearby locations
-- **Admin Approval Workflow** for quality control
-- **Media Support** with images and videos
-- **Category System** (Hospital, Factory, School, etc.)
-- **Danger Level Assessment** for safety
+### Location Management and Discovery
+- **Pre-loaded Database** with 3,000+ verified abandoned locations across the United States
+- **AI-Powered Location Generation** for discovering new abandoned places in your specific area
+- **Community Posting System** where users can share newly discovered locations to make them publicly available
+- **Spatial Queries** for finding nearby locations within customizable radius
+- **Admin Approval Workflow** for quality control and content verification
+- **Media Support** with high-quality images, videos, and location documentation
+- **Category System** (Hospital, Factory, School, etc.) with detailed historical information
+- **Danger Level Assessment** for safety ratings and exploration recommendations
+- **Discovery Status Tracking** distinguishing between database locations and user-generated discoveries
 
 ### Notification System
 - **Real-time Updates** for group activities
@@ -333,7 +352,7 @@ npm run test:coverage       # Coverage report
 - **Group Management** notifications (kicks, bans, promotions)
 - **Custom Notification Types** for different activities
 
-## 📈 Analytics & Monitoring
+## Analytics & Monitoring
 
 ### Database Views
 - **location_analytics** - View counts, likes, bookmarks per location
@@ -345,7 +364,7 @@ npm run test:coverage       # Coverage report
 - **Error tracking** with structured logging
 - **Performance metrics** ready for monitoring tools (New Relic, DataDog)
 
-## 🔧 Configuration
+## Configuration
 
 ### Database Configuration (`api/config/database.js`)
 ```javascript
@@ -372,7 +391,7 @@ const pool = mysql.createPool({
 - **Location permissions** configured in Info.plist
 - **Camera permissions** for photo upload
 
-## 🤝 Contributing
+## Contributing
 
 1. **Fork the repository**
 2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
@@ -380,21 +399,31 @@ const pool = mysql.createPool({
 4. **Push to the branch** (`git push origin feature/amazing-feature`)
 5. **Open a Pull Request**
 
-## 📄 License
+## License
 
-This project is proprietary software created for a specific client. All rights reserved.
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
 
-## 🆘 Support
+This is a personal project developed as part of a freelance assignment. While contributions are welcome, please note that all rights and copyright belong to Boris Milev.
+
+## Support
 
 For technical support and questions:
 
 - **API Documentation:** Visit `/api-docs` when server is running
 - **Database Schema:** Check `database/` directory for schema files
 - **iOS Integration:** Refer to `iOS_API_Integration_README.md`
+- **Security Issues:** Please see [SECURITY.md](SECURITY.md) for reporting vulnerabilities
+
+## Contact
+
+- **Author:** Boris Milev
+- **Email:** zvarazoku9@icloud.com
+- **GitHub:** [@BRMilev22](https://github.com/BRMilev22)
+- **Repository:** [abandoned-explorer](https://github.com/BRMilev22/abandoned-explorer)
 
 ---
 
-### 🎉 **Ready for Production**
+### **Ready for Production**
 
 This is a **complete, production-ready application** with:
 - ✅ **Scalable architecture** supporting millions of users
@@ -406,4 +435,12 @@ This is a **complete, production-ready application** with:
 - ✅ **Security best practices** implemented
 - ✅ **Performance optimizations** for scale
 
-**Start exploring abandoned places today!** 🏚️✨
+**Start exploring abandoned places today!**
+
+---
+
+<div align="center">
+  <b>Made with ❤️</b>
+  <br>
+  <sub>© 2024 Boris Milev. All rights reserved.</sub>
+</div>
