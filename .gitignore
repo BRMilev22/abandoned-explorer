@@ -79,7 +79,6 @@ Dependencies/
 
 fastlane/report.xml
 fastlane/Preview.html
-fastlane/screenshots/**/*.png
 fastlane/test_output
 
 # Code Injection
@@ -257,23 +256,6 @@ api/uploads/locations/*/*
 !api/uploads/locations/*/.gitkeep
 api/uploads/profiles/*
 !api/uploads/profiles/.gitkeep
-
-# All common media file types
-*.jpg
-*.jpeg
-*.png
-*.gif
-*.bmp
-*.tiff
-*.webp
-*.mp4
-*.mov
-*.avi
-*.mkv
-*.m4v
-*.webm
-*.3gp
-*.flv
 
 # Thumbnail files
 **/thumb_*
