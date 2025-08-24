@@ -466,5 +466,5 @@ This is a **complete, production-ready application** with:
 <div align="center">
   <b>Made with ❤️</b>
   <br>
-  <sub>© 2024 Boris Milev. All rights reserved.</sub>
+  <sub>© 2025 Boris Milev. All rights reserved.</sub>
 </div>
